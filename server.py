@@ -100,14 +100,21 @@ async def search_doctors(request: SearchRequest):
             )
         
         # Search for doctors
-        doctors = await doctor_app.search_all_sources(request.city, request.specialization)
+        doctors_data = await doctor_app.search_all_sources(request.city, request.specialization)
+        
+        # Convert Doctor objects (with datetime) to dicts (with isoformat string timestamp)
+        response_data = []
+        for doc in doctors_data:
+            doc_dict = doc.dict()  # Use Pydantic's dict() method
+            doc_dict['timestamp'] = doc.timestamp.isoformat()  # Explicit conversion
+            response_data.append(Doctor(**doc_dict))  # Validate against response model
         
         # Prepare response
         response = SearchResponse(
             success=True,
-            data=doctors,
+            data=response_data,  # Use the converted data
             metadata={
-                "total": len(doctors),
+                "total": len(response_data),
                 "timestamp": datetime.now().isoformat(),
                 "query": {
                     "city": request.city,
@@ -118,7 +125,7 @@ async def search_doctors(request: SearchRequest):
         
         # Log performance
         duration = (datetime.now() - start_time).total_seconds()
-        logger.info(f"Search completed in {duration:.2f} seconds. Found {len(doctors)} doctors.")
+        logger.info(f"Search completed in {duration:.2f} seconds. Found {len(response_data)} doctors.")
         
         return response
         

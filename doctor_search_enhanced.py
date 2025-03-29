@@ -542,22 +542,31 @@ class DoctorSearchApp:
             prompts = getattr(self.prompt_manager, f"get_{source.lower()}_prompt")(location, specialization)
             
             # Process all prompts in parallel
-            results = await self.gemini_client.generate_content_batch(prompts)
+            tasks = [self.gemini_client.generate_content(prompt) for prompt in prompts]
+            results = await asyncio.gather(*tasks, return_exceptions=True)  # Handle potential errors per prompt
             
             # Process results
             all_doctors = []
-            for result in results:
+            for i, result in enumerate(results):
+                if isinstance(result, Exception):
+                    self.logger.error(f"Error processing prompt {i+1} for {source}: {str(result)}")
+                    continue  # Skip this prompt's result
+                
                 try:
-                    doctors = self.data_processor.extract_json_from_response(result)
-                    if doctors:
-                        all_doctors.extend(
-                            self.data_processor.standardize_doctor_data(
-                                doctors, source, specialization, location
-                            )
+                    # Ensure 'result' is the string response
+                    if not isinstance(result, str):
+                        self.logger.warning(f"Unexpected result type for prompt {i+1} of {source}: {type(result)}")
+                        continue
+
+                    doctors_json = self.data_processor.extract_json_from_response(result)
+                    if doctors_json:
+                        standardized = self.data_processor.standardize_doctor_data(
+                            doctors_json, source, specialization, location
                         )
+                        all_doctors.extend(standardized)
                 except Exception as e:
-                    self.logger.error(f"Error processing {source} results: {str(e)}")
-                    continue
+                    self.logger.error(f"Error processing result for prompt {i+1} of {source}: {str(e)}")
+                    continue # Skip this result if processing fails
             
             return all_doctors
             
