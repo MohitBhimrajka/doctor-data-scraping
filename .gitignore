@@ -4,6 +4,7 @@ __pycache__/
 *$py.class
 *.so
 .Python
+env/
 build/
 develop-eggs/
 dist/
@@ -22,7 +23,6 @@ wheels/
 
 # Virtual Environment
 venv/
-env/
 ENV/
 
 # IDE
@@ -32,25 +32,23 @@ ENV/
 *.swo
 
 # Logs
-logs/
 *.log
+logs/
+server.log
+doctor_search.log
+streamlit_app.log
+
+# Database
+*.db
+doctors.db
 
 # Environment variables
 .env
 .env.local
 .env.*.local
 
-# Database
-*.db
-*.sqlite3
-
 # OS
 .DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
 Thumbs.db
 
 # Application specific
