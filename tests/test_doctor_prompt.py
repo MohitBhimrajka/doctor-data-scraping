@@ -23,7 +23,7 @@ async def test_doctor_prompt():
     
     # Create a simple search prompt
     prompt = PromptManager._add_json_instruction(
-        "site:practo.com Dermatologist doctor in Mumbai rating reviews phone number address"
+        "site:practo.com Dermatologist doctor primarily practicing in Mumbai clinic address rating reviews"
     )
     
     print(f"Testing doctor search prompt...")

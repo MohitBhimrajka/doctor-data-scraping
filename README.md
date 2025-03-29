@@ -1,6 +1,6 @@
 # Doctor Search Application
 
-A streamlined web application for finding doctors with core information (name, rating, reviews, locations, phone numbers, and source URLs) across multiple sources, built with FastAPI, Streamlit, and the Gemini API.
+A streamlined web application for finding doctors with core information (name, rating, reviews, and locations) across multiple sources, built with FastAPI, Streamlit, and the Gemini API.
 
 ## Project Structure
 
@@ -21,7 +21,7 @@ doctor-data-scraping/
 ## Features
 
 - 🔍 Search doctors by city and specialization
-- 📱 Access core information: name, rating, reviews, locations, phone numbers, source URLs
+- 📱 Access core information: name, rating, reviews, and accurate locations
 - 🚀 High throughput data collection through optimized Gemini API usage
 - 📊 Clean and intuitive user interface
 - 📥 Export results to CSV or JSON
@@ -98,9 +98,6 @@ Response:
       "rating": number,
       "reviews": number,
       "locations": ["string"],
-      "phone_numbers": ["string"],
-      "source_urls": ["string"],
-      "source": "string",
       "specialization": "string",
       "city": "string",
       "contributing_sources": ["string"],

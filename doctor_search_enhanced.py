@@ -751,19 +751,20 @@ class DoctorSearchApp:
         table.add_column("Name")
         table.add_column("Rating", justify="center")
         table.add_column("Reviews", justify="center")
-        table.add_column("Locations")
-        table.add_column("Phone Numbers")
-        table.add_column("Source URLs")
+        table.add_column("Primary Location")
+        table.add_column("Secondary Location")
         
         # Add rows to the table
         for doctor in doctors:
+            primary_location = doctor.locations[0] if doctor.locations else "N/A"
+            secondary_location = doctor.locations[1] if len(doctor.locations) > 1 else "N/A"
+            
             table.add_row(
                 doctor.name,
                 f"{doctor.rating:.1f} ⭐",
                 str(doctor.reviews),
-                "\n".join(doctor.locations[:2]) + ("..." if len(doctor.locations) > 2 else ""),
-                "\n".join(doctor.phone_numbers[:2]) + ("..." if len(doctor.phone_numbers) > 2 else ""),
-                "\n".join(doctor.source_urls[:2]) + ("..." if len(doctor.source_urls) > 2 else "")
+                primary_location,
+                secondary_location
             )
         
         console.print(table)

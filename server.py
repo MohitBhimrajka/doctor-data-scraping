@@ -60,8 +60,6 @@ class DoctorResponse(BaseModel):
     rating: float
     reviews: int
     locations: List[str]
-    phone_numbers: List[str]
-    source_urls: List[str]
     specialization: str
     city: str
     contributing_sources: List[str]
@@ -123,8 +121,8 @@ async def search_doctors(request: SearchRequest):
                 
                 # Only include fields in DoctorResponse model
                 included_fields = {
-                    'name', 'rating', 'reviews', 'locations', 'phone_numbers', 
-                    'source_urls', 'specialization', 'city', 'contributing_sources', 'timestamp'
+                    'name', 'rating', 'reviews', 'locations', 
+                    'specialization', 'city', 'contributing_sources', 'timestamp'
                 }
                 filtered_dict = {k: v for k, v in doc_dict.items() if k in included_fields}
                 
