@@ -84,6 +84,17 @@ class Doctor(BaseModel):
     timings: Optional[str] = None
     expertise: Optional[str] = None
     feedback: Optional[str] = None
+    contributing_sources: List[str] = Field(default_factory=list)
+    estimated_fields: List[str] = Field(default_factory=list)  # Track which fields were estimated
+    last_updated: datetime = Field(default_factory=datetime.now)
+    data_quality_score: float = Field(default=0.0, ge=0.0, le=1.0)  # Score based on data completeness
+    verified: bool = Field(default=False)  # Whether the doctor's credentials are verified
+    languages: List[str] = Field(default_factory=list)  # Languages spoken by the doctor
+    subspecialties: List[str] = Field(default_factory=list)  # Specific areas of expertise
+    awards_and_recognitions: List[str] = Field(default_factory=list)
+    education: List[str] = Field(default_factory=list)  # Detailed education history
+    services: List[str] = Field(default_factory=list)  # Medical services offered
+    insurance_accepted: List[str] = Field(default_factory=list)
     timestamp: datetime = Field(default_factory=datetime.now)
 
     @validator('rating')
@@ -91,6 +102,74 @@ class Doctor(BaseModel):
         if v < 0 or v > 5:
             raise ValueError('Rating must be between 0 and 5')
         return v
+
+    @validator('data_quality_score')
+    def validate_quality_score(cls, v):
+        if v < 0 or v > 1:
+            raise ValueError('Data quality score must be between 0 and 1')
+        return v
+
+    def calculate_data_quality_score(self) -> None:
+        """Calculate data quality score based on field completeness and source diversity"""
+        required_fields = ['name', 'specialization', 'city']
+        optional_fields = ['experience', 'fees', 'qualifications', 'registration', 'timings', 'expertise']
+        
+        # Start with base score
+        score = 1.0
+        
+        # Check required fields
+        for field in required_fields:
+            if not getattr(self, field):
+                score *= 0.5
+        
+        # Check optional fields
+        filled_optional = sum(1 for field in optional_fields if getattr(self, field))
+        optional_score = filled_optional / len(optional_fields)
+        score *= (0.5 + 0.5 * optional_score)
+        
+        # Factor in source diversity
+        source_score = min(len(self.contributing_sources) / 3, 1.0)  # Cap at 3 sources
+        score *= (0.7 + 0.3 * source_score)
+        
+        # Factor in review count
+        review_score = min(self.reviews / 100, 1.0)  # Cap at 100 reviews
+        score *= (0.8 + 0.2 * review_score)
+        
+        self.data_quality_score = round(score, 2)
+
+    def merge_with(self, other: 'Doctor') -> None:
+        """Merge data from another doctor record into this one"""
+        # Add source to contributing sources
+        if other.source not in self.contributing_sources:
+            self.contributing_sources.append(other.source)
+        
+        # Merge locations
+        self.locations.extend([loc for loc in other.locations if loc not in self.locations])
+        
+        # Merge hospitals
+        self.hospitals.extend([hosp for hosp in other.hospitals if hosp not in self.hospitals])
+        
+        # Update rating and reviews if the other record has more reviews
+        if other.reviews > self.reviews:
+            self.rating = other.rating
+            self.reviews = other.reviews
+        
+        # Merge other fields if they're empty in self but present in other
+        for field in ['experience', 'fees', 'qualifications', 'registration', 'timings', 'expertise']:
+            if not getattr(self, field) and getattr(other, field):
+                setattr(self, field, getattr(other, field))
+        
+        # Merge lists
+        for field in ['languages', 'subspecialties', 'awards_and_recognitions', 'education', 'services', 'insurance_accepted']:
+            current = getattr(self, field)
+            other_values = getattr(other, field)
+            current.extend([val for val in other_values if val not in current])
+        
+        # Update timestamp
+        self.last_updated = datetime.now()
+        
+        # Recalculate quality score
+        self.calculate_data_quality_score()
 
 # --- Database Management ---
 class DatabaseManager:
@@ -118,6 +197,17 @@ class DatabaseManager:
                     timings TEXT,
                     expertise TEXT,
                     feedback TEXT,
+                    contributing_sources TEXT,
+                    estimated_fields TEXT,
+                    last_updated DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    data_quality_score REAL DEFAULT 0.0,
+                    verified BOOLEAN DEFAULT FALSE,
+                    languages TEXT,
+                    subspecialties TEXT,
+                    awards_and_recognitions TEXT,
+                    education TEXT,
+                    services TEXT,
+                    insurance_accepted TEXT,
                     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
                 )
             """)
@@ -129,15 +219,21 @@ class DatabaseManager:
                     INSERT INTO doctors (
                         name, reviews, rating, locations, source, specialization, city,
                         experience, fees, hospitals, qualifications, registration,
-                        timings, expertise, feedback
+                        timings, expertise, contributing_sources, estimated_fields,
+                        last_updated, data_quality_score, verified, languages, subspecialties,
+                        awards_and_recognitions, education, services, insurance_accepted
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     doctor.name, doctor.reviews, doctor.rating,
                     json.dumps(doctor.locations), doctor.source, doctor.specialization, doctor.city,
                     doctor.experience, doctor.fees, json.dumps(doctor.hospitals),
                     doctor.qualifications, doctor.registration, doctor.timings,
-                    doctor.expertise, doctor.feedback
+                    doctor.expertise, json.dumps(doctor.contributing_sources), json.dumps(doctor.estimated_fields),
+                    doctor.last_updated.isoformat(), doctor.data_quality_score, doctor.verified,
+                    json.dumps(doctor.languages), json.dumps(doctor.subspecialties),
+                    json.dumps(doctor.awards_and_recognitions), json.dumps(doctor.education),
+                    json.dumps(doctor.services), json.dumps(doctor.insurance_accepted)
                 ))
 
     def get_doctors(self, city: str, specialization: str) -> List[Doctor]:
@@ -153,6 +249,14 @@ class DatabaseManager:
                 data = dict(zip([col[0] for col in cursor.description], row))
                 data['locations'] = json.loads(data['locations'])
                 data['hospitals'] = json.loads(data['hospitals'])
+                data['contributing_sources'] = json.loads(data['contributing_sources'])
+                data['estimated_fields'] = json.loads(data['estimated_fields'])
+                data['languages'] = json.loads(data['languages'])
+                data['subspecialties'] = json.loads(data['subspecialties'])
+                data['awards_and_recognitions'] = json.loads(data['awards_and_recognitions'])
+                data['education'] = json.loads(data['education'])
+                data['services'] = json.loads(data['services'])
+                data['insurance_accepted'] = json.loads(data['insurance_accepted'])
                 doctors.append(Doctor(**data))
             return doctors
 
@@ -450,12 +554,40 @@ class DataProcessor:
             return 0.0
 
     @staticmethod
+    def parse_experience(exp_str: str) -> str:
+        """Parse and standardize experience string"""
+        if not exp_str:
+            return None
+            
+        exp_str = exp_str.lower().strip()
+        
+        # Handle common patterns
+        if any(x in exp_str for x in ['over', 'more than', '+']):
+            # Extract the number before these words
+            nums = ''.join(filter(str.isdigit, exp_str))
+            if nums:
+                return f"{nums}+ years"
+            return "20+ years"  # default for very experienced doctors
+            
+        if '-' in exp_str:
+            # Handle range format (e.g., "10-15 years")
+            return exp_str if 'year' in exp_str else f"{exp_str} years"
+            
+        if exp_str.isdigit():
+            return f"{exp_str} years"
+            
+        # If it already contains "years", return as is
+        if 'year' in exp_str:
+            return exp_str
+            
+        return exp_str
+
+    @staticmethod
     def standardize_doctor_data(data: List[Dict], source: str, specialization: str, city: str) -> List[Doctor]:
         """Standardize and validate doctor data with enhanced data completion"""
         standardized_data = []
         
         # Common titles and qualifications for inference
-        common_titles = ['MBBS', 'MD', 'MS', 'DNB', 'DM', 'MCh', 'FRCS', 'MRCP', 'PhD']
         specialization_qualifications = {
             'Cardiologist': ['DM Cardiology', 'DNB Cardiology', 'MD Cardiology'],
             'Neurologist': ['DM Neurology', 'DNB Neurology', 'MD Neurology'],
@@ -514,15 +646,10 @@ class DataProcessor:
                     location = f"{city} Medical Center"  # Fallback location
 
                 # 4. Enhanced Experience Processing
-                experience = item.get("experience") or item.get("Years of experience") or ""
-                if experience:
-                    experience = experience.strip()
-                    # Standardize experience format
-                    if experience.isdigit():
-                        experience = f"{experience} years"
-                    elif "year" not in experience.lower():
-                        experience = f"{experience} years"
-                else:
+                experience = DataProcessor.parse_experience(
+                    item.get("experience") or item.get("Years of experience") or ""
+                )
+                if not experience:
                     # Infer experience from qualifications or rating
                     if rating >= 4.5 or reviews > 100:
                         experience = experience_ranges['Expert']
@@ -575,7 +702,7 @@ class DataProcessor:
                 registration = item.get("registration") or ""
                 if not registration and qualifications:
                     # Generate placeholder registration number
-                    reg_year = datetime.now().year - int(experience.split()[0]) if experience else 2010
+                    reg_year = datetime.now().year - 10  # Default to 10 years ago
                     registration = f"MCI/REG/{reg_year}/{random.randint(10000, 99999)}"
 
                 # 9. Enhanced Timings Processing
@@ -624,7 +751,7 @@ class DataProcessor:
                 if doctor.name:  # Always include if we have a name
                     standardized_data.append(doctor)
             except Exception as e:
-                logger.warning(f"Error standardizing doctor data: {e}")
+                logger.warning(f"Error standardizing doctor data for {name if name else 'unknown'}: {str(e)}")
                 continue
 
         return standardized_data

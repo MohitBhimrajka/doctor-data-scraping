@@ -9,6 +9,7 @@ from doctor_search_enhanced import Config, DoctorSearchApp
 import asyncio
 import logging
 from datetime import datetime
+import json
 
 # Load environment variables
 load_dotenv()
@@ -36,17 +37,17 @@ FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[FRONTEND_URL],
+    allow_origins=["*"],  # Allows all origins
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["*"],  # Allows all methods
+    allow_headers=["*"],  # Allows all headers
 )
 
 # Initialize the doctor search app
 config = Config()
 if not config.validate():
     logger.error("Configuration validation failed. Please check your environment variables.")
-    raise RuntimeError("Configuration validation failed")
+    raise Exception("Configuration validation failed")
 
 doctor_app = DoctorSearchApp(config)
 
@@ -54,19 +55,38 @@ class SearchRequest(BaseModel):
     city: str = Field(..., min_length=1, description="City to search for doctors")
     specialization: str = Field(..., min_length=1, description="Doctor specialization")
 
-class Doctor(BaseModel):
+class DoctorResponse(BaseModel):
     name: str
-    rating: float
     reviews: int
+    rating: float
     locations: List[str]
     source: str
     specialization: str
     city: str
-    timestamp: str
+    experience: Optional[str]
+    fees: Optional[str]
+    hospitals: List[str]
+    qualifications: Optional[str]
+    registration: Optional[str]
+    timings: Optional[str]
+    expertise: Optional[str]
+    feedback: Optional[str]
+    contributing_sources: List[str] = Field(default_factory=list)
+    estimated_fields: List[str] = Field(default_factory=list)
+    last_updated: datetime
+    data_quality_score: float = Field(default=0.0, ge=0.0, le=1.0)
+    verified: bool = Field(default=False)
+    languages: List[str] = Field(default_factory=list)
+    subspecialties: List[str] = Field(default_factory=list)
+    awards_and_recognitions: List[str] = Field(default_factory=list)
+    education: List[str] = Field(default_factory=list)
+    services: List[str] = Field(default_factory=list)
+    insurance_accepted: List[str] = Field(default_factory=list)
+    timestamp: datetime
 
 class SearchResponse(BaseModel):
     success: bool
-    data: Optional[List[Doctor]] = None
+    data: Optional[List[DoctorResponse]] = None
     error: Optional[str] = None
     metadata: dict = {
         "total": 0,
@@ -74,6 +94,13 @@ class SearchResponse(BaseModel):
         "query": {
             "city": "",
             "specialization": ""
+        },
+        "sources_used": List[str],  # Track all sources queried
+        "search_duration": float,    # Search duration in seconds
+        "data_quality": {
+            "average_score": float,
+            "complete_profiles": int,
+            "verified_profiles": int
         }
     }
 
@@ -86,11 +113,10 @@ async def read_root():
         "timestamp": datetime.now().isoformat()
     }
 
-@app.post("/api/search", response_model=SearchResponse)
+@app.post("/search")
 async def search_doctors(request: SearchRequest):
-    start_time = datetime.now()
     try:
-        logger.info(f"Received search request for {request.specialization} in {request.city}")
+        logger.info(f"Searching for {request.specialization} in {request.city}")
         
         # Validate input
         if not request.city.strip() or not request.specialization.strip():
@@ -99,64 +125,59 @@ async def search_doctors(request: SearchRequest):
                 detail="City and specialization cannot be empty"
             )
         
-        # Search for doctors
-        doctors_data = await doctor_app.search_all_sources(request.city, request.specialization)
+        # Execute search
+        doctors = await doctor_app.search_all_sources(request.city, request.specialization)
         
-        # Convert Doctor objects (with datetime) to dicts (with isoformat string timestamp)
+        # Convert to response format
         response_data = []
-        for doc in doctors_data:
-            doc_dict = doc.dict()  # Use Pydantic's dict() method
-            doc_dict['timestamp'] = doc.timestamp.isoformat()  # Explicit conversion
-            response_data.append(Doctor(**doc_dict))  # Validate against response model
+        for doc in doctors:
+            try:
+                doc_dict = doc.model_dump()  # Use Pydantic's model_dump() method
+                # Convert datetime to string if present
+                if 'timestamp' in doc_dict:
+                    doc_dict['timestamp'] = doc_dict['timestamp'].isoformat()
+                response_data.append(DoctorResponse(**doc_dict))
+            except Exception as e:
+                logger.error(f"Error converting doctor data: {str(e)}")
+                continue
         
         # Prepare response
         response = SearchResponse(
             success=True,
-            data=response_data,  # Use the converted data
+            data=response_data,
             metadata={
                 "total": len(response_data),
                 "timestamp": datetime.now().isoformat(),
                 "query": {
                     "city": request.city,
                     "specialization": request.specialization
+                },
+                "sources_used": [],
+                "search_duration": 0.0,
+                "data_quality": {
+                    "average_score": 0.0,
+                    "complete_profiles": 0,
+                    "verified_profiles": 0
                 }
             }
         )
         
-        # Log performance
-        duration = (datetime.now() - start_time).total_seconds()
-        logger.info(f"Search completed in {duration:.2f} seconds. Found {len(response_data)} doctors.")
-        
+        logger.info(f"Search completed in {len(response_data)} doctors.")
         return response
         
-    except HTTPException as he:
-        logger.error(f"HTTP error during search: {str(he)}")
-        return SearchResponse(
-            success=False,
-            error=str(he.detail),
-            metadata={
-                "total": 0,
-                "timestamp": datetime.now().isoformat(),
-                "query": {
-                    "city": request.city,
-                    "specialization": request.specialization
-                }
-            }
-        )
     except Exception as e:
-        logger.error(f"Unexpected error during search: {str(e)}")
-        return SearchResponse(
-            success=False,
-            error="An unexpected error occurred while searching for doctors",
-            metadata={
-                "total": 0,
-                "timestamp": datetime.now().isoformat(),
-                "query": {
-                    "city": request.city,
-                    "specialization": request.specialization
-                }
-            }
+        logger.error(f"Search error: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail={"message": "An error occurred during the search", "error": str(e)}
         )
+
+@app.get("/health")
+async def health_check():
+    return {
+        "status": "healthy",
+        "timestamp": datetime.now().isoformat()
+    }
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
