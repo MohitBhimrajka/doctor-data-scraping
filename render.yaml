@@ -1,24 +1,17 @@
 services:
   - type: web
-    name: doctor-search-backend
+    name: doctor-search-app
     env: python
-    buildCommand: pip install -r requirements.txt
-    startCommand: python server.py
+    buildCommand: |
+      pip install -r requirements.txt
+      cd streamlit-frontend && pip install -r requirements.txt
+    startCommand: chmod +x run_render.sh && ./run_render.sh
     envVars:
       - key: GEMINI_API_KEY
         sync: false
-      - key: FRONTEND_URL
-        value: https://doctor-search-frontend.onrender.com
-    healthCheckPath: /health
-    autoDeploy: true
-
-  - type: web
-    name: doctor-search-frontend
-    env: python
-    buildCommand: cd streamlit-frontend && pip install -r requirements.txt
-    startCommand: cd streamlit-frontend && streamlit run app_streamlit.py --server.port $PORT --server.address 0.0.0.0
-    envVars:
       - key: BACKEND_API_URL
-        value: https://doctor-search-backend.onrender.com
-    healthCheckPath: /
+        value: http://localhost:8000
+      - key: FRONTEND_URL
+        value: http://localhost:8000
+    healthCheckPath: /health
     autoDeploy: true 
