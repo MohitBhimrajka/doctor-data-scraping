@@ -19,13 +19,8 @@ from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskPr
 from rich.table import Table
 from rich.panel import Panel
 import random
-from sqlalchemy import create_engine, Column, String, Float, Integer, DateTime
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
-import base64
 from google import genai
 from google.genai import types
-import functools
 
 # Configure logging
 logging.basicConfig(
@@ -37,19 +32,6 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger(__name__)
-
-# Define a fallback for asyncio.to_thread if it doesn't exist
-if not hasattr(asyncio, 'to_thread'):
-    async def to_thread(func, *args, **kwargs):
-        """
-        Asynchronously run function *func* in a separate thread.
-        A fallback implementation for older Python versions.
-        """
-        loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(
-            None, functools.partial(func, *args, **kwargs)
-        )
-    asyncio.to_thread = to_thread
 
 # Initialize rich console for better UI
 console = Console()
@@ -636,61 +618,55 @@ class GeminiClient:
     )
     async def generate_content(self, prompt: str) -> str:
         """
-        Generate content using Google's Gemini API
+        Generate content using Google's Gemini API (Corrected with native async)
         """
         logger.debug(f"Generating content with prompt: {prompt[:100]}...")
         try:
-            # Create content as expected by the Gemini API
-            contents = [
-                types.Content(
-                    role="user",
-                    parts=[
-                        types.Part.from_text(text=prompt),
-                    ],
-                ),
-            ]
-            
-            # Use the native async method directly on the model name
-            response = await asyncio.to_thread(
-                self.client.generate_content,
-                model=self.model_name,
-                contents=contents,
-                generation_config=types.GenerationConfig(
-                    temperature=0.1,
-                    top_p=0.95,
-                    top_k=64,
-                    max_output_tokens=8192,
-                ),
-                safety_settings=[
-                    {
-                        "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
-                        "threshold": "BLOCK_ONLY_HIGH"
-                    },
-                    {
-                        "category": "HARM_CATEGORY_HATE_SPEECH",
-                        "threshold": "BLOCK_ONLY_HIGH"
-                    },
-                    {
-                        "category": "HARM_CATEGORY_HARASSMENT",
-                        "threshold": "BLOCK_ONLY_HIGH"
-                    },
-                    {
-                        "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
-                        "threshold": "BLOCK_ONLY_HIGH"
-                    }
-                ]
-            )
-            
-            # Check if the response has content
-            if response and hasattr(response, 'text'):
-                return response.text
-            else:
-                logger.warning("Empty or invalid response from Gemini API")
-                return ""
-            
+            async with self.semaphore:
+                # Get the model instance
+                model = genai.GenerativeModel(model_name=self.model_name)
+                
+                # Call the native async method ON THE MODEL
+                response = await model.generate_content_async(
+                    contents=prompt,
+                    generation_config=types.GenerationConfig(
+                        temperature=0.2,
+                        top_p=0.95,
+                        top_k=64,
+                        max_output_tokens=8192,
+                    ),
+                    safety_settings=[
+                        {
+                            "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+                            "threshold": "BLOCK_ONLY_HIGH"
+                        },
+                        {
+                            "category": "HARM_CATEGORY_HATE_SPEECH",
+                            "threshold": "BLOCK_ONLY_HIGH"
+                        },
+                        {
+                            "category": "HARM_CATEGORY_HARASSMENT",
+                            "threshold": "BLOCK_ONLY_HIGH"
+                        },
+                        {
+                            "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                            "threshold": "BLOCK_ONLY_HIGH"
+                        }
+                    ]
+                )
+                
+                # Check if the response has content
+                if response and hasattr(response, 'text'):
+                    return response.text
+                elif response and hasattr(response, 'parts'):
+                    return "".join(part.text for part in response.parts)
+                else:
+                    logger.warning(f"Empty or unexpected response structure from Gemini API for prompt: {prompt[:50]}...")
+                    return ""
+                
         except Exception as e:
             logger.error(f"Error generating content: {type(e).__name__}: {str(e)}")
-            raise
+            raise  # Let tenacity handle the retry
 
     async def generate_content_batch(self, prompts: List[str]) -> List[Optional[str]]:
         """Generate content for multiple prompts in parallel"""

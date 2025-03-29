@@ -256,9 +256,19 @@ def display_doctor_card(doctor: dict):
         if doctor.get('source_urls'):
             st.markdown("**🔗 Source URLs:**")
             urls_html = ""
-            for url in doctor['source_urls']:
-                # Make URLs clickable with target="_blank" to open in new tab
-                urls_html += f'<span class="source-item"><a href="{url}" target="_blank">View Profile</a></span>'
+            for i, url in enumerate(doctor['source_urls']):
+                try:
+                    # Attempt to extract domain
+                    if '//' in url:
+                        domain = url.split('//')[1].split('/')[0]
+                    else:
+                        domain = url.split('/')[0]
+                    if domain.startswith('www.'):
+                        domain = domain[4:]
+                    link_text = domain
+                except Exception:
+                    link_text = f"Source {i+1}"  # Fallback link text
+                urls_html += f'<span class="source-item"><a href="{url}" target="_blank">{link_text}</a></span>'
             st.markdown(urls_html, unsafe_allow_html=True)
         else:
             st.markdown("**🔗 Source URLs:** <span style='color: #888;'>Not Available</span>", unsafe_allow_html=True)
