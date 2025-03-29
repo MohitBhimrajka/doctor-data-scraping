@@ -175,7 +175,7 @@ def apply_custom_css():
     }}
     
     .logo-container img {{
-        height: 45px;
+        height: 12px;
         width: auto;
         transition: transform 0.3s ease;
     }}
@@ -269,26 +269,56 @@ def apply_custom_css():
         transform: translateY(-1px);
     }}
     
-    .spec-button-selected {{
-        background-color: {COLORS['navy_blue']};
-        color: white;
-        border: 1px solid {COLORS['navy_blue']};
-        font-weight: 500;
+    /* Primary button styling - make selected state more obvious */
+    .stButton > button[data-baseweb="button"][kind="primary"] {{
+        background-color: #e6f0ff;
+        color: #000b37;
+        border: 2px solid #000b37;
+        font-weight: 600;
+        transform: translateY(-1px);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     }}
     
-    .spec-button-selected:hover {{
-        background-color: #000929;
-        border-color: #000929;
+    .stButton > button[data-baseweb="button"][kind="primary"]:hover {{
+        background-color: #d1e3ff;
+        border-color: #000b37;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
     }}
     
-    /* Custom specialization input */
+    /* Custom specialization button styling */
+    .stButton > button[data-baseweb="button"][kind="secondary"]:has-text("Other (Custom)") {{
+        background-color: #fef3c7;
+        color: #92400e;
+        border: 2px solid #92400e;
+        font-weight: 600;
+    }}
+    
+    .stButton > button[data-baseweb="button"][kind="secondary"]:has-text("Other (Custom)"):hover {{
+        background-color: #fde68a;
+        border-color: #92400e;
+    }}
+    
+    /* Custom specialization input container */
     .custom-spec-container {{
         margin-top: 1rem;
         padding: 1.25rem;
-        background-color: #f9fafb;
+        background-color: #fef3c7;
         border-radius: 8px;
-        border: 1px solid #e5e7eb;
+        border: 2px solid #92400e;
         animation: fadeIn 0.5s ease-in-out;
+    }}
+    
+    /* Custom specialization input styling */
+    .custom-spec-container .stTextInput > div > div > input {{
+        background-color: white;
+        border: 1px solid #92400e;
+        color: #92400e;
+    }}
+    
+    .custom-spec-container .stTextInput > div > div > input:focus {{
+        border-color: #92400e;
+        box-shadow: 0 0 0 2px rgba(146, 64, 14, 0.1);
     }}
     
     /* Search button styling */
@@ -831,10 +861,10 @@ def display_search_results(results: dict):
         with col1:
             st.markdown("<p style='color:#000b37; font-weight:600; margin-bottom:0.5rem;'>Sort By</p>", unsafe_allow_html=True)
             sort_option = st.radio(
-                "",
+                "Sort By",  # Use a proper label
                 options=["Rating (High to Low)", "Reviews (High to Low)"],
                 horizontal=True,
-                label_visibility="collapsed"
+                label_visibility="collapsed"  # Hide the label since we're using our custom styled label
             )
         
         with col2:
@@ -986,9 +1016,10 @@ def main():
     # City input section - full width
     st.markdown('<p class="input-label">Enter City</p>', unsafe_allow_html=True)
     city = st.text_input(
-        "",  # Empty label since we use custom label above
+        "City",  # Use a proper label 
         placeholder="e.g., Mumbai, Delhi, Bangalore",
-        help="Enter the city where you want to find doctors"
+        help="Enter the city where you want to find doctors",
+        label_visibility="collapsed"  # Hide the label since we're using our custom styled label
     )
     
     # Specialization section
@@ -1006,11 +1037,14 @@ def main():
     for idx, spec in enumerate(POPULAR_SPECIALIZATIONS):
         with cols[idx % 4]:
             # Create clickable buttons with appropriate styling
+            button_type = "primary" if st.session_state.selected_specialization == spec else "secondary"
+            if spec == "Other (Custom)":
+                button_type = "secondary"  # Always use secondary for custom button
             if st.button(
                 spec,
                 key=f"spec_{idx}",
                 use_container_width=True,
-                type="primary" if st.session_state.selected_specialization == spec else "secondary"
+                type=button_type
             ):
                 st.session_state.selected_specialization = spec
                 if spec != "Other (Custom)":
