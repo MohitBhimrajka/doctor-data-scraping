@@ -122,15 +122,40 @@ Response:
 
 ## Troubleshooting
 
-### Common Issues
+### Database Schema Errors
 
-1. **"Configuration validation failed" error**:
-   - Make sure you have set a valid `GEMINI_API_KEY` in your `.env` file
-   - Ensure the API key has proper permissions and hasn't expired
+If you see an error such as:
+```
+ERROR - Search error: table doctors has no column named locations
+```
 
-2. **Backend connection issues from frontend**:
-   - Verify the backend is running
-   - Check that `BACKEND_API_URL` in the frontend's `.env` matches where the backend is running
+This indicates a mismatch between the database schema defined in the code and the actual structure of the `doctors.db` file. The application uses SQLite with a `CREATE TABLE IF NOT EXISTS` statement which won't modify an existing table structure.
+
+**Solution**: Delete the existing `doctors.db` file. A new database with the correct schema will be created automatically when you run the application again.
+
+```bash
+# From the project root directory
+rm doctors.db
+```
+
+The updated `run_app.sh` script will detect if `doctors.db` exists and prompt you to delete it if necessary.
+
+### API Connection Issues
+
+If the frontend shows a connection error to the backend:
+
+1. Verify that the backend service is running (check for FastAPI logs in terminal)
+2. Ensure the `.env` file in the `streamlit-frontend` directory has the correct `BACKEND_API_URL` setting
+3. Check if any firewall or network settings are blocking the connection
+
+### No Search Results
+
+If your search completes but returns no doctors:
+
+1. Verify that you've entered a valid city and specialization
+2. Check the logs for any specific errors during the search process
+3. Try a different combination of city and specialization
+4. Check the Google API key validity and quota limits
 
 ## Data Sources
 The application searches across multiple sources:

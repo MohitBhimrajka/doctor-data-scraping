@@ -34,6 +34,22 @@ trap cleanup SIGINT SIGTERM
 # Define virtual environment directory
 VENV_DIR="venv"
 
+# Check if doctors.db exists and prompt for deletion
+if [ -f "doctors.db" ]; then
+    print_message "YELLOW" "WARNING: An existing doctors.db file was detected."
+    print_message "YELLOW" "If you've updated the application code and the database schema has changed,"
+    print_message "YELLOW" "you should delete this file to avoid database schema errors."
+    
+    read -p "Do you want to delete the existing doctors.db file? (y/n): " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        rm doctors.db
+        print_message "GREEN" "doctors.db has been deleted. A new database will be created when you run the application."
+    else
+        print_message "YELLOW" "Keeping existing doctors.db file. Note that this may cause errors if the schema has changed."
+    fi
+fi
+
 # Create virtual environment if it doesn't exist
 if [ ! -d "$VENV_DIR" ]; then
     print_message "BLUE" "Creating virtual environment in $VENV_DIR directory..."

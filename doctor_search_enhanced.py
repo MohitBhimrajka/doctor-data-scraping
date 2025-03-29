@@ -635,45 +635,90 @@ class GeminiClient:
         wait=wait_exponential(multiplier=1, min=4, max=10)
     )
     async def generate_content(self, prompt: str) -> str:
-        """Generate content using Google Generative AI with error handling and retries"""
+        """
+        Generate content using Google's Gemini API
+        """
+        logger.debug(f"Generating content with prompt: {prompt[:100]}...")
         try:
-            async with self.semaphore:
-                contents = [
-                    types.Content(
-                        role="user",
-                        parts=[
-                            types.Part.from_text(text=prompt),
-                        ],
-                    ),
+            # Create content as expected by the Gemini API
+            contents = [
+                types.Content(
+                    role="user",
+                    parts=[
+                        types.Part.from_text(text=prompt),
+                    ],
+                ),
+            ]
+            
+            # Use the native async method directly on the model name
+            response = await asyncio.to_thread(
+                self.client.generate_content,
+                model=self.model_name,
+                contents=contents,
+                generation_config=types.GenerationConfig(
+                    temperature=0.1,
+                    top_p=0.95,
+                    top_k=64,
+                    max_output_tokens=8192,
+                ),
+                safety_settings=[
+                    {
+                        "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+                        "threshold": "BLOCK_ONLY_HIGH"
+                    },
+                    {
+                        "category": "HARM_CATEGORY_HATE_SPEECH",
+                        "threshold": "BLOCK_ONLY_HIGH"
+                    },
+                    {
+                        "category": "HARM_CATEGORY_HARASSMENT",
+                        "threshold": "BLOCK_ONLY_HIGH"
+                    },
+                    {
+                        "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                        "threshold": "BLOCK_ONLY_HIGH"
+                    }
                 ]
-                
-                generate_content_config = types.GenerateContentConfig(
-                    response_mime_type="text/plain",
-                )
-                
-                response = await asyncio.to_thread(
-                    self.client.models.generate_content,
-                    model=self.model_name,
-                    contents=contents,
-                    config=generate_content_config,
-                )
-                
+            )
+            
+            # Check if the response has content
+            if response and hasattr(response, 'text'):
                 return response.text
+            else:
+                logger.warning("Empty or invalid response from Gemini API")
+                return ""
+            
         except Exception as e:
-            logger.error(f"Error calling Gemini API: {str(e)}")
-            raise  # Let tenacity handle the retry
+            logger.error(f"Error generating content: {type(e).__name__}: {str(e)}")
+            raise
 
     async def generate_content_batch(self, prompts: List[str]) -> List[Optional[str]]:
         """Generate content for multiple prompts in parallel"""
-        async def process_prompt(prompt: str) -> Optional[str]:
-            try:
-                return await self.generate_content(prompt)
-            except Exception as e:
-                logger.error(f"Failed to process prompt after retries: {str(e)}")
-                return None
-
-        tasks = [process_prompt(prompt) for prompt in prompts]
-        return await asyncio.gather(*tasks)
+        tasks = []
+        
+        for prompt in prompts:
+            # Use the async method directly rather than a nested function
+            tasks.append(self.generate_content(prompt))
+        
+        # Use asyncio.gather to run all tasks concurrently
+        results = []
+        try:
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            
+            # Process results to handle exceptions
+            processed_results = []
+            for result in results:
+                if isinstance(result, Exception):
+                    logger.error(f"Error in batch processing: {type(result).__name__}: {str(result)}")
+                    processed_results.append(None)
+                else:
+                    processed_results.append(result)
+            
+            return processed_results
+        except Exception as e:
+            logger.error(f"Error in batch processing: {type(e).__name__}: {str(e)}")
+            # Return a list of None values matching the length of prompts
+            return [None] * len(prompts)
 
 # --- Main Application ---
 class DoctorSearchApp:

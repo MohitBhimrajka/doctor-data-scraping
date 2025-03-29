@@ -153,15 +153,19 @@ async def search_doctors(request: SearchRequest):
         return response
         
     except Exception as e:
-        logger.error(f"Search error: {str(e)}")
-        return SearchResponse(
-            success=False,
-            error=str(e),
-            metadata={
-                "timestamp": datetime.now().isoformat(),
-                "query": {
-                    "city": request.city,
-                    "specialization": request.specialization
+        logger.error(f"Search error: {type(e).__name__} - {str(e)}")
+        return JSONResponse(
+            status_code=500,
+            content={
+                "success": False,
+                "error": f"An internal server error occurred: {type(e).__name__}",
+                "detail": str(e),
+                "metadata": {
+                    "timestamp": datetime.now().isoformat(),
+                    "query": {
+                        "city": request.city,
+                        "specialization": request.specialization
+                    }
                 }
             }
         )

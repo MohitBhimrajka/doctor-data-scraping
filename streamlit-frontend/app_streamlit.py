@@ -255,31 +255,22 @@ def display_doctor_card(doctor: dict):
         # Source URL(s)
         if doctor.get('source_urls'):
             st.markdown("**🔗 Source URLs:**")
-            sources_html = ""
-            for i, url in enumerate(doctor['source_urls']):
-                # Extract domain name for display
-                try:
-                    # Get domain from URL
-                    if '//' in url:
-                        domain = url.split('//')[1].split('/')[0]
-                    else:
-                        domain = url.split('/')[0]
-                    
-                    # Remove www. if present
-                    if domain.startswith('www.'):
-                        domain = domain[4:]
-                    
-                    # Use domain as link text
-                    sources_html += f'<span class="source-item"><a href="{url}" target="_blank">{domain}</a></span>'
-                except:
-                    # Fallback to numbered source if domain extraction fails
-                    sources_html += f'<span class="source-item"><a href="{url}" target="_blank">Source {i+1}</a></span>'
-            st.markdown(sources_html, unsafe_allow_html=True)
+            urls_html = ""
+            for url in doctor['source_urls']:
+                # Make URLs clickable with target="_blank" to open in new tab
+                urls_html += f'<span class="source-item"><a href="{url}" target="_blank">View Profile</a></span>'
+            st.markdown(urls_html, unsafe_allow_html=True)
         else:
             st.markdown("**🔗 Source URLs:** <span style='color: #888;'>Not Available</span>", unsafe_allow_html=True)
+            
+        # Contributing Sources
+        if doctor.get('contributing_sources'):
+            st.markdown("**🔍 Data Sources:**")
+            sources_html = ""
+            for source in doctor['contributing_sources']:
+                sources_html += f'<span class="source-item">{source}</span>'
+            st.markdown(sources_html, unsafe_allow_html=True)
         
-        # Add a bit more space between cards
-        st.markdown('<div style="margin-bottom: 20px;"></div>', unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
 def display_search_results(results: dict):
@@ -369,73 +360,80 @@ def display_search_results(results: dict):
 def main():
     # Set page config
     st.set_page_config(
-        page_title="Doctor Search | Supervity",
+        page_title="Doctor Search | Find the Best Doctors",
         page_icon="🩺",
-        layout="wide"
+        layout="wide",
+        initial_sidebar_state="collapsed"
     )
     
     # Apply custom CSS
     apply_custom_css()
     
-    # Title and description
-    st.markdown('<div class="title">Doctor Search</div>', unsafe_allow_html=True)
-    st.markdown('<div class="subtitle">Find doctors by specialization and location</div>', unsafe_allow_html=True)
+    # Page title and intro
+    st.markdown('<h1 class="title">🩺 Doctor Search</h1>', unsafe_allow_html=True)
+    st.markdown('<p class="subtitle">Find the best doctors across multiple platforms</p>', unsafe_allow_html=True)
     
-    # Search form in columns
-    col1, col2, col3 = st.columns([2, 2, 1])
+    # Create three columns layout for the search form
+    col1, col2, col3 = st.columns(3)
     
     with col1:
-        city = st.text_input("City", placeholder="Enter city name")
+        # City input (with popular Indian cities as examples)
+        city = st.text_input("City", placeholder="e.g., Mumbai, Delhi, Bangalore")
     
     with col2:
-        specialization = st.selectbox(
-            "Specialization",
-            options=list(specializations.values())
-        )
+        # Specialization selection
+        specialization = st.selectbox("Specialization", options=list(specializations.values()))
     
     with col3:
-        st.markdown("<br>", unsafe_allow_html=True)  # Add some spacing
+        # Search button that triggers the API call
         search_button = st.button("Search", use_container_width=True)
     
-    # Handle search
-    if search_button:
-        if not city or not specialization:
-            st.warning("Please enter both city and specialization.")
-            return
-            
-        with st.spinner("Searching for doctors, please wait..."):
-            st.markdown(f"""
-            <div class="search-status" style="background-color: #e8f4fd;">
-                Searching for {specialization} doctors in {city}...
-            </div>
-            """, unsafe_allow_html=True)
-            
-            try:
-                # Call backend API
-                results = run_async(search_doctors(city, specialization))
-                
-                # Check for specific connection errors
-                if not results.get('success', False) and "Failed to connect to the backend" in results.get('error', ''):
-                    st.error("Cannot connect to the backend server. Please check if the server is running and try again.")
-                    st.info("Technical details: " + results.get('error', ''))
-                    return
-                    
-                # Display results
-                display_search_results(results)
-            except Exception as e:
-                st.error(f"An unexpected error occurred: {str(e)}")
-                logger.error(f"Frontend error: {str(e)}")
+    # Initialize session state if not already done
+    if 'search_results' not in st.session_state:
+        st.session_state.search_results = None
+    if 'is_searching' not in st.session_state:
+        st.session_state.is_searching = False
+    if 'error' not in st.session_state:
+        st.session_state.error = None
     
-    # Show instructions if no search has been performed
-    if 'results' not in locals():
-        st.info("""
-        ### How to use:
-        1. Enter a city name
-        2. Select a medical specialization
-        3. Click the Search button
-        
-        You'll get a list of doctors with their ratings, reviews, locations, phone numbers, and source links.
-        """)
+    # Handle search button click
+    if search_button:
+        # Validate inputs
+        if not city or not specialization:
+            st.error("Please enter both city and specialization")
+        else:
+            try:
+                # Set searching state
+                st.session_state.is_searching = True
+                st.session_state.error = None
+                
+                # Show searching message
+                with st.spinner(f"Searching for {specialization} in {city}..."):
+                    # Call the search function
+                    results = run_async(search_doctors(city, specialization))
+                    
+                    # Store results in session state
+                    st.session_state.search_results = results
+                    st.session_state.is_searching = False
+                    
+                    # Check if the API returned an error
+                    if not results.get('success', False):
+                        error_message = results.get('error', 'Unknown error')
+                        error_detail = results.get('detail', '')
+                        error_text = f"{error_message}"
+                        if error_detail:
+                            error_text += f"\nDetails: {error_detail}"
+                        st.session_state.error = error_text
+                        st.error(error_text)
+                    
+                    # Rerun the app to update the UI with the search results
+                    st.rerun()
+                    
+            except Exception as e:
+                st.session_state.is_searching = False
+                error_message = f"Error: {type(e).__name__} - {str(e)}"
+                st.session_state.error = error_message
+                st.error(error_message)
 
 if __name__ == "__main__":
     main() 
