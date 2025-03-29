@@ -238,29 +238,55 @@ def display_doctor_card(doctor: dict):
             for location in doctor['locations']:
                 locations_html += f'<span class="location-item">{location}</span>'
             st.markdown(locations_html, unsafe_allow_html=True)
+        else:
+            st.markdown("**📍 Locations:** <span style='color: #888;'>Not Available</span>", unsafe_allow_html=True)
         
         # Phone Number(s)
         if doctor.get('phone_numbers'):
             st.markdown("**📞 Phone Numbers:**")
             phones_html = ""
             for phone in doctor['phone_numbers']:
+                # Make phone numbers clickable with tel: links
                 phones_html += f'<span class="phone-item"><a href="tel:{phone}">{phone}</a></span>'
             st.markdown(phones_html, unsafe_allow_html=True)
+        else:
+            st.markdown("**📞 Phone Numbers:** <span style='color: #888;'>Not Available</span>", unsafe_allow_html=True)
         
         # Source URL(s)
         if doctor.get('source_urls'):
             st.markdown("**🔗 Source URLs:**")
             sources_html = ""
             for i, url in enumerate(doctor['source_urls']):
-                sources_html += f'<span class="source-item"><a href="{url}" target="_blank">Source {i+1}</a></span>'
+                # Extract domain name for display
+                try:
+                    # Get domain from URL
+                    if '//' in url:
+                        domain = url.split('//')[1].split('/')[0]
+                    else:
+                        domain = url.split('/')[0]
+                    
+                    # Remove www. if present
+                    if domain.startswith('www.'):
+                        domain = domain[4:]
+                    
+                    # Use domain as link text
+                    sources_html += f'<span class="source-item"><a href="{url}" target="_blank">{domain}</a></span>'
+                except:
+                    # Fallback to numbered source if domain extraction fails
+                    sources_html += f'<span class="source-item"><a href="{url}" target="_blank">Source {i+1}</a></span>'
             st.markdown(sources_html, unsafe_allow_html=True)
+        else:
+            st.markdown("**🔗 Source URLs:** <span style='color: #888;'>Not Available</span>", unsafe_allow_html=True)
         
+        # Add a bit more space between cards
+        st.markdown('<div style="margin-bottom: 20px;"></div>', unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
 def display_search_results(results: dict):
     """Display search results with a focus on core fields"""
     if not results.get('success', False):
-        st.error(f"Search failed: {results.get('error', 'Unknown error')}")
+        error_message = results.get('error', 'Unknown error')
+        st.error(f"Search failed: {error_message}")
         return
     
     data = results.get('data', [])
@@ -293,7 +319,7 @@ def display_search_results(results: dict):
     for doctor in sorted_data:
         display_doctor_card(doctor)
     
-    # Create dataframe for download
+    # Create dataframe for download - improved CSV formatting
     df = pd.DataFrame([
         {
             'Name': d.get('name', ''),
@@ -303,7 +329,8 @@ def display_search_results(results: dict):
             'Phone Numbers': '; '.join(d.get('phone_numbers', [])),
             'Source URLs': '; '.join(d.get('source_urls', [])),
             'Specialization': d.get('specialization', ''),
-            'City': d.get('city', '')
+            'City': d.get('city', ''),
+            'Contributing Sources': '; '.join(d.get('contributing_sources', []))
         } for d in sorted_data
     ])
     
@@ -319,6 +346,7 @@ def display_search_results(results: dict):
         )
     
     with col2:
+        # Preserve proper list structure in JSON
         json_data = json.dumps([{
             'name': d.get('name', ''),
             'rating': d.get('rating', 0),
@@ -327,7 +355,8 @@ def display_search_results(results: dict):
             'phone_numbers': d.get('phone_numbers', []),
             'source_urls': d.get('source_urls', []),
             'specialization': d.get('specialization', ''),
-            'city': d.get('city', '')
+            'city': d.get('city', ''),
+            'contributing_sources': d.get('contributing_sources', [])
         } for d in sorted_data], indent=2)
         
         st.download_button(
@@ -369,7 +398,11 @@ def main():
         search_button = st.button("Search", use_container_width=True)
     
     # Handle search
-    if search_button and city and specialization:
+    if search_button:
+        if not city or not specialization:
+            st.warning("Please enter both city and specialization.")
+            return
+            
         with st.spinner("Searching for doctors, please wait..."):
             st.markdown(f"""
             <div class="search-status" style="background-color: #e8f4fd;">
@@ -377,11 +410,21 @@ def main():
             </div>
             """, unsafe_allow_html=True)
             
-            # Call backend API
-            results = run_async(search_doctors(city, specialization))
-            
-            # Display results
-            display_search_results(results)
+            try:
+                # Call backend API
+                results = run_async(search_doctors(city, specialization))
+                
+                # Check for specific connection errors
+                if not results.get('success', False) and "Failed to connect to the backend" in results.get('error', ''):
+                    st.error("Cannot connect to the backend server. Please check if the server is running and try again.")
+                    st.info("Technical details: " + results.get('error', ''))
+                    return
+                    
+                # Display results
+                display_search_results(results)
+            except Exception as e:
+                st.error(f"An unexpected error occurred: {str(e)}")
+                logger.error(f"Frontend error: {str(e)}")
     
     # Show instructions if no search has been performed
     if 'results' not in locals():

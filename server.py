@@ -62,7 +62,6 @@ class DoctorResponse(BaseModel):
     locations: List[str]
     phone_numbers: List[str]
     source_urls: List[str]
-    source: str
     specialization: str
     city: str
     contributing_sources: List[str]
@@ -111,7 +110,7 @@ async def search_doctors(request: SearchRequest):
         
         search_duration = (datetime.now() - start_time).total_seconds()
         
-        # Get list of sources queried
+        # Sources we're querying in this application
         sources_queried = ["practo", "justdial", "general", "hospital", "social"]
         
         # Convert to response format
@@ -121,7 +120,15 @@ async def search_doctors(request: SearchRequest):
                 # Convert doctor model to dict, ensuring datetime is string
                 doc_dict = doc.model_dump()
                 doc_dict['timestamp'] = doc_dict['timestamp'].isoformat()
-                response_data.append(DoctorResponse(**doc_dict))
+                
+                # Only include fields in DoctorResponse model
+                included_fields = {
+                    'name', 'rating', 'reviews', 'locations', 'phone_numbers', 
+                    'source_urls', 'specialization', 'city', 'contributing_sources', 'timestamp'
+                }
+                filtered_dict = {k: v for k, v in doc_dict.items() if k in included_fields}
+                
+                response_data.append(DoctorResponse(**filtered_dict))
             except Exception as e:
                 logger.error(f"Error converting doctor data: {str(e)}")
                 continue
@@ -147,9 +154,16 @@ async def search_doctors(request: SearchRequest):
         
     except Exception as e:
         logger.error(f"Search error: {str(e)}")
-        raise HTTPException(
-            status_code=500,
-            detail={"message": "An error occurred during the search", "error": str(e)}
+        return SearchResponse(
+            success=False,
+            error=str(e),
+            metadata={
+                "timestamp": datetime.now().isoformat(),
+                "query": {
+                    "city": request.city,
+                    "specialization": request.specialization
+                }
+            }
         )
 
 @app.get("/health")

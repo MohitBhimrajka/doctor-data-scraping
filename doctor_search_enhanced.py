@@ -5,15 +5,13 @@ import logging
 import argparse
 import asyncio
 import pandas as pd
-from typing import List, Dict, Optional, Any
+from typing import List, Dict, Optional, Any, Callable
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-import google.generativeai as genai
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field, validator
 from fuzzywuzzy import fuzz
-import aiohttp
 from tenacity import retry, stop_after_attempt, wait_exponential
 import sqlite3
 from rich.console import Console
@@ -27,6 +25,7 @@ from sqlalchemy.orm import sessionmaker
 import base64
 from google import genai
 from google.genai import types
+import functools
 
 # Configure logging
 logging.basicConfig(
@@ -38,6 +37,19 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger(__name__)
+
+# Define a fallback for asyncio.to_thread if it doesn't exist
+if not hasattr(asyncio, 'to_thread'):
+    async def to_thread(func, *args, **kwargs):
+        """
+        Asynchronously run function *func* in a separate thread.
+        A fallback implementation for older Python versions.
+        """
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(
+            None, functools.partial(func, *args, **kwargs)
+        )
+    asyncio.to_thread = to_thread
 
 # Initialize rich console for better UI
 console = Console()
@@ -72,7 +84,6 @@ class Doctor(BaseModel):
     locations: List[str] = Field(default_factory=list)
     phone_numbers: List[str] = Field(default_factory=list)
     source_urls: List[str] = Field(default_factory=list)
-    source: str  # Original source
     specialization: str
     city: str
     contributing_sources: List[str] = Field(default_factory=list)
@@ -86,9 +97,10 @@ class Doctor(BaseModel):
 
     def merge_with(self, other: 'Doctor') -> None:
         """Merge data from another doctor record into this one"""
-        # Add source to contributing sources
-        if other.source not in self.contributing_sources:
-            self.contributing_sources.append(other.source)
+        # Add contributing sources 
+        for source in other.contributing_sources:
+            if source not in self.contributing_sources:
+                self.contributing_sources.append(source)
         
         # Merge locations
         self.locations.extend([loc for loc in other.locations if loc not in self.locations])
@@ -103,6 +115,9 @@ class Doctor(BaseModel):
         if other.reviews > self.reviews:
             self.rating = other.rating
             self.reviews = other.reviews
+        # If review counts are equal, prioritize higher rating
+        elif other.reviews == self.reviews and other.rating > self.rating:
+            self.rating = other.rating
         
         # Update timestamp
         self.timestamp = datetime.now()
@@ -124,7 +139,6 @@ class DatabaseManager:
                     locations TEXT,
                     phone_numbers TEXT,
                     source_urls TEXT,
-                    source TEXT,
                     specialization TEXT,
                     city TEXT,
                     contributing_sources TEXT,
@@ -138,13 +152,13 @@ class DatabaseManager:
                 conn.execute("""
                     INSERT INTO doctors (
                         name, rating, reviews, locations, phone_numbers, source_urls,
-                        source, specialization, city, contributing_sources, timestamp
+                        specialization, city, contributing_sources, timestamp
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     doctor.name, doctor.rating, doctor.reviews,
                     json.dumps(doctor.locations), json.dumps(doctor.phone_numbers),
-                    json.dumps(doctor.source_urls), doctor.source, doctor.specialization,
+                    json.dumps(doctor.source_urls), doctor.specialization,
                     doctor.city, json.dumps(doctor.contributing_sources),
                     doctor.timestamp.isoformat()
                 ))
@@ -175,6 +189,21 @@ class DatabaseManager:
 # --- Prompt Management ---
 class PromptManager:
     @staticmethod
+    def _add_json_instruction(prompt: str) -> str:
+        """
+        Add JSON specific instruction to each prompt to ensure consistent output format
+        """
+        json_instruction = (
+            "Provide results in the following JSON format only: "
+            "[{\"name\": \"Doctor Name\", \"rating\": 4.5, \"reviews\": 120, "
+            "\"location\": [\"Address 1\", \"Address 2\"], "
+            "\"phone_number\": [\"+1234567890\"], "
+            "\"url\": [\"https://example.com/profile\"]}]. "
+            "Output only the JSON list with no explanatory text."
+        )
+        return f"{prompt}. {json_instruction}"
+
+    @staticmethod
     def get_practo_prompt(location: str, specialization: str) -> List[str]:
         """Generate prompts for Practo search"""
         prompts = []
@@ -195,15 +224,15 @@ class PromptManager:
         
         # Generate more detailed queries
         for pattern in base_patterns:
-            prompts.append(pattern)
+            prompts.append(PromptManager._add_json_instruction(pattern))
             
             # Add variations with common doctor prefixes
             for prefix in ["Dr.", "Doctor", "Prof. Dr.", "Dr", "MD"]:
-                prompts.append(f"{pattern} {prefix}")
+                prompts.append(PromptManager._add_json_instruction(f"{pattern} {prefix}"))
             
             # Add variations with specific location types
             for loc_type in ["hospital", "clinic", "medical center", "healthcare", "practice"]:
-                prompts.append(f"{pattern} {loc_type}")
+                prompts.append(PromptManager._add_json_instruction(f"{pattern} {loc_type}"))
         
         # Add specific rating-focused queries
         rating_patterns = [
@@ -212,7 +241,8 @@ class PromptManager:
             f"site:practo.com best reviewed {specialization} doctor {location} contact information",
             f"site:practo.com top {specialization} doctor {location} rating phone address"
         ]
-        prompts.extend(rating_patterns)
+        for pattern in rating_patterns:
+            prompts.append(PromptManager._add_json_instruction(pattern))
         
         # Add specific contact-focused queries
         contact_patterns = [
@@ -220,7 +250,8 @@ class PromptManager:
             f"site:practo.com {specialization} {location} clinic address phone consultation",
             f"site:practo.com {specialization} doctor {location} office phone numbers profile"
         ]
-        prompts.extend(contact_patterns)
+        for pattern in contact_patterns:
+            prompts.append(PromptManager._add_json_instruction(pattern))
         
         return prompts
 
@@ -245,32 +276,8 @@ class PromptManager:
         
         # Generate more detailed queries
         for pattern in base_patterns:
-            prompts.append(pattern)
+            prompts.append(PromptManager._add_json_instruction(pattern))
             
-            # Add variations with common doctor prefixes
-            for prefix in ["Dr.", "Doctor", "Prof.", "MD"]:
-                prompts.append(f"{pattern} {prefix}")
-            
-            # Add variations with specific location types
-            for loc_type in ["clinic", "hospital", "center", "office", "chamber"]:
-                prompts.append(f"{pattern} {loc_type}")
-        
-        # Add specific rating-focused queries
-        rating_patterns = [
-            f"site:justdial.com highest rated {specialization} doctor {location} contact",
-            f"site:justdial.com 5 star {specialization} {location} phone number address",
-            f"site:justdial.com best reviewed {specialization} doctor {location} contact"
-        ]
-        prompts.extend(rating_patterns)
-        
-        # Add specific contact-focused queries
-        contact_patterns = [
-            f"site:justdial.com {specialization} doctor {location} multiple clinic locations",
-            f"site:justdial.com {specialization} {location} direct phone number address",
-            f"site:justdial.com contact {specialization} doctor {location} listing details"
-        ]
-        prompts.extend(contact_patterns)
-        
         return prompts
 
     @staticmethod
@@ -294,21 +301,21 @@ class PromptManager:
         
         # Generate more detailed queries
         for pattern in base_patterns:
-            prompts.append(pattern)
+            prompts.append(PromptManager._add_json_instruction(pattern))
             
             # Add variations with common doctor prefixes
             for prefix in ["Dr.", "Doctor", "Prof. Dr.", "MD"]:
-                prompts.append(f"{prefix} {pattern}")
+                prompts.append(PromptManager._add_json_instruction(f"{prefix} {pattern}"))
             
             # Add variations with location and rating specifics
             for loc_type in ["clinic", "hospital", "practice", "center", "chamber"]:
-                prompts.append(f"{pattern} {loc_type}")
+                prompts.append(PromptManager._add_json_instruction(f"{pattern} {loc_type}"))
         
         # Add search engine variations
         for site in ["", "site:healthgrades.com", "site:zocdoc.com", "site:google.com/maps"]:
             for pattern in base_patterns[:3]:  # Use only the first few base patterns
                 if site:
-                    prompts.append(f"{site} {pattern}")
+                    prompts.append(PromptManager._add_json_instruction(f"{site} {pattern}"))
         
         # Add specific rating-focused queries
         rating_patterns = [
@@ -317,7 +324,8 @@ class PromptManager:
             f"best reviewed {specialization} clinic {location} contact",
             f"{specialization} doctor with most reviews in {location} phone"
         ]
-        prompts.extend(rating_patterns)
+        for pattern in rating_patterns:
+            prompts.append(PromptManager._add_json_instruction(pattern))
         
         # Add specific contact-focused queries
         contact_patterns = [
@@ -325,7 +333,8 @@ class PromptManager:
             f"{specialization} {location} clinic address contact numbers",
             f"contact details for {specialization} doctors in {location} ratings"
         ]
-        prompts.extend(contact_patterns)
+        for pattern in contact_patterns:
+            prompts.append(PromptManager._add_json_instruction(pattern))
         
         return prompts
 
@@ -350,7 +359,8 @@ class PromptManager:
                 f"site:{hospital}hospital.com {specialization} doctor profile {location} contact",
                 f"site:{hospital}health.com {specialization} physician {location} rating phone"
             ]
-            prompts.extend(base_patterns)
+            for pattern in base_patterns:
+                prompts.append(PromptManager._add_json_instruction(pattern))
         
         # Generate general hospital-related queries
         general_patterns = [
@@ -361,7 +371,8 @@ class PromptManager:
             f"multispecialty hospital {specialization} {location} doctor phone address",
             f"hospital directory {specialization} doctors {location} contact ratings"
         ]
-        prompts.extend(general_patterns)
+        for pattern in general_patterns:
+            prompts.append(PromptManager._add_json_instruction(pattern))
         
         return prompts
 
@@ -381,7 +392,8 @@ class PromptManager:
             f"site:ratemds.com {specialization} doctor {location} phone contact ratings"
         ]
         
-        prompts.extend(base_patterns)
+        for pattern in base_patterns:
+            prompts.append(PromptManager._add_json_instruction(pattern))
         
         # Additional socially-derived patterns
         social_patterns = [
@@ -390,7 +402,8 @@ class PromptManager:
             f"trusted {specialization} doctor {location} ratings contact information",
             f"well-rated {specialization} clinic {location} phone address reviews"
         ]
-        prompts.extend(social_patterns)
+        for pattern in social_patterns:
+            prompts.append(PromptManager._add_json_instruction(pattern))
         
         # Add specific review-focused queries
         review_patterns = [
@@ -398,7 +411,8 @@ class PromptManager:
             f"site:yelp.com highest rated {specialization} {location} contact information",
             f"best reviewed {specialization} doctor {location} practice phone location"
         ]
-        prompts.extend(review_patterns)
+        for pattern in review_patterns:
+            prompts.append(PromptManager._add_json_instruction(pattern))
         
         return prompts
 
@@ -474,13 +488,20 @@ class DataProcessor:
                     elif isinstance(item['location'], str):
                         locations.append(item['location'])
                 
-                # Clean locations
+                # Clean locations more thoroughly
                 cleaned_locations = []
+                generic_terms = ['near', 'opposite', 'behind', 'next to', 'in front of', 'across from', 'located at']
                 for loc in locations:
                     if loc and isinstance(loc, str):
-                        # Remove duplicates and very short locations
+                        # Remove very short locations and apply basic cleaning
                         loc = loc.strip()
-                        if len(loc) > 3 and loc not in cleaned_locations:
+                        # Remove generic location descriptors that don't add value
+                        for term in generic_terms:
+                            if loc.lower().startswith(term):
+                                loc = loc[len(term):].strip()
+                        
+                        # Keep only reasonable length locations (not too short, not too long)
+                        if 3 < len(loc) < 150 and loc not in cleaned_locations:
                             cleaned_locations.append(loc)
                 
                 # Process phone numbers - ensure it's a list
@@ -494,15 +515,24 @@ class DataProcessor:
                             for number in item[field].split(','):
                                 phone_numbers.append(number.strip())
                 
-                # Clean phone numbers
+                # Clean phone numbers more thoroughly
                 cleaned_phones = []
                 for phone in phone_numbers:
                     if phone and isinstance(phone, str):
-                        # Basic cleaning - keep only digits and some special chars
-                        phone = ''.join(c for c in phone if c.isdigit() or c in '+-() ')
-                        phone = phone.strip()
-                        if len(phone) >= 6 and phone not in cleaned_phones:  # Minimum valid length
-                            cleaned_phones.append(phone)
+                        # Normalize format - remove all non-digit characters except + for country code
+                        digits_only = ''.join(c for c in phone if c.isdigit() or c == '+')
+                        
+                        # Handle country codes - if no + prefix and length > 10, assume it needs one
+                        if not digits_only.startswith('+') and len(digits_only) > 10:
+                            # For Indian numbers (assume most common case)
+                            if digits_only.startswith('91') and len(digits_only) >= 12:
+                                digits_only = '+' + digits_only
+                            elif len(digits_only) == 10:  # Likely a local number without country code
+                                digits_only = '+91' + digits_only  # Add India country code by default
+                        
+                        # Filter invalid numbers (too short)
+                        if len(digits_only) >= 7 and digits_only not in cleaned_phones:
+                            cleaned_phones.append(digits_only)
                 
                 # Process source URLs - ensure it's a list
                 source_urls = []
@@ -513,16 +543,27 @@ class DataProcessor:
                         elif isinstance(item[field], str):
                             source_urls.append(item[field])
                 
-                # Clean source URLs
+                # Clean source URLs with strict validation
                 cleaned_urls = []
+                url_prefixes = ['http://', 'https://']
                 for url in source_urls:
                     if url and isinstance(url, str):
                         url = url.strip()
-                        if url.startswith('www.'):
-                            url = 'https://' + url
-                        if not url.startswith('http'):
-                            url = 'https://' + url
-                        if url not in cleaned_urls:
+                        
+                        # Add proper prefix if missing
+                        has_valid_prefix = any(url.startswith(prefix) for prefix in url_prefixes)
+                        if not has_valid_prefix:
+                            if url.startswith('www.'):
+                                url = 'https://' + url
+                            else:
+                                url = 'https://' + url
+                        
+                        # Basic URL validation using string pattern checks
+                        has_domain = '.' in url.split('//')[-1]
+                        has_no_spaces = ' ' not in url
+                        reasonable_length = 10 <= len(url) <= 500
+                        
+                        if has_domain and has_no_spaces and reasonable_length and url not in cleaned_urls:
                             cleaned_urls.append(url)
                 
                 # Create doctor object with only the core fields
@@ -533,7 +574,6 @@ class DataProcessor:
                     locations=cleaned_locations,
                     phone_numbers=cleaned_phones,
                     source_urls=cleaned_urls,
-                    source=source,
                     specialization=specialization,
                     city=city,
                     contributing_sources=[source]
@@ -584,9 +624,10 @@ class DataProcessor:
 # --- API Client ---
 class GeminiClient:
     def __init__(self, api_key: str, model_name: str):
+        """Initialize the Gemini client with API key and model name"""
         self.api_key = api_key
         self.model_name = model_name
-        genai.configure(api_key=api_key)
+        self.client = genai.Client(api_key=api_key)
         self.semaphore = asyncio.Semaphore(200)  # Significantly increased for better parallelization
 
     @retry(
@@ -597,10 +638,27 @@ class GeminiClient:
         """Generate content using Google Generative AI with error handling and retries"""
         try:
             async with self.semaphore:
-                model = genai.GenerativeModel(self.model_name)
-                completion = model.generate_content(prompt)
-                response = completion.text
-                return response
+                contents = [
+                    types.Content(
+                        role="user",
+                        parts=[
+                            types.Part.from_text(text=prompt),
+                        ],
+                    ),
+                ]
+                
+                generate_content_config = types.GenerateContentConfig(
+                    response_mime_type="text/plain",
+                )
+                
+                response = await asyncio.to_thread(
+                    self.client.models.generate_content,
+                    model=self.model_name,
+                    contents=contents,
+                    config=generate_content_config,
+                )
+                
+                return response.text
         except Exception as e:
             logger.error(f"Error calling Gemini API: {str(e)}")
             raise  # Let tenacity handle the retry
