@@ -77,6 +77,22 @@ COLORS = {
     "dark_gray": "#333333",   # For text
 }
 
+# Define popular specializations
+POPULAR_SPECIALIZATIONS = [
+    'Cardiologist',
+    'Dermatologist',
+    'Pediatrician',
+    'Orthopedist',
+    'Dentist',
+    'General Physician',
+    'Gynecologist',
+    'ENT Specialist',
+    'Ophthalmologist',
+    'Psychiatrist',
+    'Neurologist',
+    'Other (Custom)'
+]
+
 # Function to load the Supervity logo
 def load_logo():
     # Look for the logo file in the streamlit-frontend directory
@@ -142,32 +158,34 @@ def apply_custom_css():
         background-color: white;
     }}
     
-    /* Main container */
+    /* Main container - centered with max width */
     .main .block-container {{
-        padding-top: 2rem;
+        padding-top: 1.5rem;
         padding-bottom: 2rem;
+        max-width: 1000px;
+        margin: 0 auto;
     }}
     
     /* Logo styling */
     .logo-container {{
         display: flex;
         justify-content: center;
-        align-items: center;
-        margin-bottom: 1.5rem;
+        margin-bottom: 0.5rem;
         width: 100%;
     }}
     
     .logo-container img {{
-        max-width: 250px;
-        margin: 0 auto;
+        height: 45px;
+        width: auto;
+        transition: transform 0.3s ease;
     }}
     
     /* Title styling */
     .title {{
         color: {COLORS['navy_blue']};
         font-weight: bold;
-        font-size: 2.5rem;
-        margin-bottom: 1rem;
+        font-size: 2.2rem;
+        margin-bottom: 0.5rem;
         text-align: center;
         animation: fadeIn 0.8s ease-in-out;
     }}
@@ -175,152 +193,269 @@ def apply_custom_css():
     /* Subtitle styling */
     .subtitle {{
         color: {COLORS['dark_gray']};
-        font-size: 1.2rem;
-        margin-bottom: 2rem;
+        font-size: 1.1rem;
+        margin-bottom: 1.5rem;
         text-align: center;
-        animation: slideIn 1s ease-in-out;
+        animation: slideIn 0.8s ease-in-out;
     }}
     
-    /* Buttons */
+    /* Search container */
+    .search-container {{
+        background-color: #ffffff;
+        border-radius: 12px;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+        padding: 2rem;
+        margin-bottom: 2rem;
+        animation: fadeIn 0.8s ease-in-out;
+        border: 1px solid #f0f0f0;
+    }}
+    
+    /* Search container title */
+    .search-title {{
+        color: {COLORS['navy_blue']};
+        font-size: 1.3rem;
+        font-weight: 600;
+        margin-bottom: 1.5rem;
+        text-align: center;
+    }}
+    
+    /* Input fields styling */
+    .input-label {{
+        font-weight: 600;
+        color: {COLORS['navy_blue']};
+        font-size: 1rem;
+        margin-bottom: 0.5rem;
+    }}
+    
+    .stTextInput > div > div > input {{
+        border-radius: 8px;
+        border: 2px solid #e5e7eb;
+        padding: 0.75rem 1rem;
+        font-size: 1rem;
+        box-shadow: none;
+        transition: all 0.2s ease;
+    }}
+    
+    .stTextInput > div > div > input:focus {{
+        border-color: {COLORS['navy_blue']};
+        box-shadow: 0 0 0 2px rgba(0, 11, 55, 0.1);
+    }}
+    
+    /* Specialization tags grid */
+    .spec-section {{
+        margin: 1.5rem 0;
+    }}
+    
+    /* Specialization tags styling */
+    .spec-button {{
+        background-color: #f9fafb;
+        color: #374151;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        padding: 0.6rem 0.5rem;
+        text-align: center;
+        font-size: 0.9rem;
+        margin-bottom: 0.75rem;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+        display: block;
+        width: 100%;
+    }}
+    
+    .spec-button:hover {{
+        background-color: #f3f4f6;
+        border-color: #d1d5db;
+        transform: translateY(-1px);
+    }}
+    
+    .spec-button-selected {{
+        background-color: {COLORS['navy_blue']};
+        color: white;
+        border: 1px solid {COLORS['navy_blue']};
+        font-weight: 500;
+    }}
+    
+    .spec-button-selected:hover {{
+        background-color: #000929;
+        border-color: #000929;
+    }}
+    
+    /* Custom specialization input */
+    .custom-spec-container {{
+        margin-top: 1rem;
+        padding: 1.25rem;
+        background-color: #f9fafb;
+        border-radius: 8px;
+        border: 1px solid #e5e7eb;
+        animation: fadeIn 0.5s ease-in-out;
+    }}
+    
+    /* Search button styling */
     .stButton > button {{
         background-color: {COLORS['navy_blue']};
         color: white;
-        font-weight: bold;
-        padding: 0.5rem 2rem;
-        border-radius: 5px;
+        font-weight: 600;
+        padding: 0.75rem 2rem;
+        border-radius: 8px;
         border: none;
-        transition: all 0.3s ease;
-        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
-    }}
-    .stButton > button:hover {{
-        background-color: {COLORS['lime_green']};
-        color: white;
-        transform: translateY(-2px);
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+        transition: all 0.2s ease;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        font-size: 1rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto;
     }}
     
-    /* Search form styling */
-    .search-form {{
-        background-color: white;
-        padding: 2rem;
-        border-radius: 10px;
-        box-shadow: 0 4px 12px rgba(0, 11, 55, 0.1);
-        margin-bottom: 2rem;
+    .stButton > button:hover {{
+        background-color: #000929;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
+    }}
+    
+    .stButton > button:active {{
+        transform: translateY(0);
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+    }}
+    
+    .stButton > button:disabled {{
+        background-color: #d1d5db;
+        color: #6b7280;
+        cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
+    }}
+    
+    /* Results section styling */
+    .results-section {{
         animation: fadeIn 0.8s ease-in-out;
     }}
     
     /* Results count box */
     .results-count {{
-        font-size: 1.2rem;
-        color: white;
-        margin: 1rem 0;
-        padding: 0.8rem;
-        background-color: {COLORS['navy_blue']};
-        border-radius: 5px;
-        text-align: center;
-        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
-        animation: pulse 2s infinite;
+        background-color: #f9fafb;
+        border-left: 4px solid {COLORS['navy_blue']};
+        color: #374151;
+        padding: 1rem 1.25rem;
+        border-radius: 6px;
+        font-size: 1.1rem;
+        margin: 1.5rem 0;
+        display: flex;
+        align-items: center;
+    }}
+    
+    .results-count svg {{
+        margin-right: 0.5rem;
+        fill: {COLORS['navy_blue']};
     }}
     
     /* Table styling */
-    .dataframe {{
-        border-radius: 5px;
+    .stDataFrame {{
+        border-radius: 8px;
         overflow: hidden;
-        animation: fadeIn 1s ease-in-out;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }}
+    
+    .dataframe {{
+        border-collapse: separate;
+        border-spacing: 0;
+        width: 100%;
+        border-radius: 8px;
+        overflow: hidden;
+    }}
+    
+    .dataframe thead th {{
+        background-color: {COLORS['navy_blue']};
+        color: white;
+        font-weight: 600;
+        text-align: left;
+        padding: 1rem;
+        font-size: 0.9rem;
+    }}
+    
+    .dataframe tbody td {{
+        padding: 0.75rem 1rem;
+        border-bottom: 1px solid #e5e7eb;
+        font-size: 0.9rem;
+    }}
+    
+    .dataframe tbody tr:last-child td {{
+        border-bottom: none;
+    }}
+    
+    .dataframe tbody tr:nth-child(even) {{
+        background-color: #f9fafb;
+    }}
+    
+    .dataframe tbody tr:hover {{
+        background-color: #f3f4f6;
     }}
     
     /* Download section */
     .download-section {{
-        background-color: white;
-        padding: 2rem;
-        border-radius: 10px;
-        margin: 2rem auto;
-        border: 1px solid #e0e0e0;
-        box-shadow: 0 4px 12px rgba(0, 11, 55, 0.1);
-        animation: fadeIn 1s ease-in-out;
-        max-width: 800px;
-        text-align: center;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 1.5rem 0;
     }}
     
-    /* Download title */
-    .download-title {{
-        font-weight: bold;
-        font-size: 1.3rem;
-        margin-bottom: 1.5rem;
-        color: {COLORS['navy_blue']};
-        text-align: center;
-    }}
-    
-    /* Download button */
     .download-button {{
         background-color: {COLORS['navy_blue']};
         color: white;
-        padding: 1rem 2rem;
-        border-radius: 5px;
-        text-decoration: none;
-        font-weight: bold;
-        display: inline-block;
-        transition: all 0.3s ease;
-        border: none;
-        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        font-weight: 600;
+        padding: 0.75rem 1.5rem;
+        border-radius: 8px;
         cursor: pointer;
-        text-align: center;
-        max-width: 400px;
-        margin: 0 auto;
-        font-size: 1.1rem;
+        transition: all 0.2s ease;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        text-decoration: none;
+        font-size: 0.95rem;
+    }}
+    
+    .download-button svg {{
+        margin-right: 0.5rem;
     }}
     
     .download-button:hover {{
-        background-color: {COLORS['lime_green']};
+        background-color: #000929;
         transform: translateY(-2px);
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     }}
     
-    /* Custom specialization box */
-    .custom-specialization {{
-        margin-top: 0.5rem;
-        padding: 1rem;
-        background-color: #f8f9fa;
-        border-radius: 5px;
-        border: 1px solid #e0e0e0;
-        animation: fadeIn 0.8s ease-in-out;
-    }}
-    
-    /* Sources pills */
-    .sources-pill {{
-        display: inline-block;
-        padding: 4px 12px;
-        margin: 3px;
-        border-radius: 20px;
-        background-color: {COLORS['navy_blue']};
-        color: white;
-        font-size: 0.85rem;
-        box-shadow: 0 2px 3px rgba(0, 0, 0, 0.1);
-    }}
-    
-    /* Sidebar styling */
-    .css-1r6slb0 {{
-        background-color: {COLORS['navy_blue']};
-        color: white;
-    }}
-    .css-1r6slb0 .css-vsklj7 {{
-        color: white;
-    }}
-    
-    /* Loading spinner */
+    /* Loading state and animations */
     .stSpinner > div {{
         border-top-color: {COLORS['navy_blue']} !important;
     }}
     
-    /* Debug info */
-    .debug-info {{
-        background-color: #f8f9fa;
-        padding: 1rem;
-        border-radius: 5px;
-        margin-top: 2rem;
-        font-family: monospace;
-        font-size: 0.8rem;
-        animation: fadeIn 1s ease-in-out;
+    .loading-container {{
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem;
+        text-align: center;
+        animation: fadeIn 0.5s ease-in-out;
+    }}
+    
+    .loading-text {{
+        margin-top: 1rem;
+        color: {COLORS['navy_blue']};
+        font-weight: 500;
+    }}
+    
+    /* Sources pill */
+    .source-pill {{
+        display: inline-block;
+        background-color: #f3f4f6;
+        color: #374151;
+        font-size: 0.75rem;
+        padding: 0.25rem 0.5rem;
+        margin: 0.15rem;
+        border-radius: 100px;
+        border: 1px solid #e5e7eb;
     }}
     
     /* Animations */
@@ -330,45 +465,24 @@ def apply_custom_css():
     }}
     
     @keyframes slideIn {{
-        from {{ transform: translateY(20px); opacity: 0; }}
+        from {{ transform: translateY(10px); opacity: 0; }}
         to {{ transform: translateY(0); opacity: 1; }}
     }}
     
-    @keyframes pulse {{
-        0% {{ box-shadow: 0 0 0 0 rgba(0, 11, 55, 0.4); }}
-        70% {{ box-shadow: 0 0 0 10px rgba(0, 11, 55, 0); }}
-        100% {{ box-shadow: 0 0 0 0 rgba(0, 11, 55, 0); }}
-    }}
-    
-    /* Radio buttons styling */
-    .stRadio > div {{
-        display: flex;
-        gap: 10px;
-    }}
-    
-    .stRadio > div > label {{
-        background-color: #f0f0f0;
-        padding: 0.5rem 1rem;
-        border-radius: 5px;
-        transition: all 0.3s ease;
-    }}
-    
-    .stRadio > div > label:hover {{
-        background-color: #e0e0e0;
-    }}
-    
-    .stRadio > div > label > div {{
-        display: flex;
-        align-items: center;
+    /* Hide Streamlit default elements */
+    #MainMenu, footer, header {{
+        visibility: hidden;
     }}
     
     /* Scrollbar styling */
     ::-webkit-scrollbar {{
         width: 8px;
+        height: 8px;
     }}
     
     ::-webkit-scrollbar-track {{
         background: #f1f1f1;
+        border-radius: 4px;
     }}
     
     ::-webkit-scrollbar-thumb {{
@@ -377,7 +491,7 @@ def apply_custom_css():
     }}
     
     ::-webkit-scrollbar-thumb:hover {{
-        background: {COLORS['lime_green']};
+        background: #000929;
     }}
     </style>
     """, unsafe_allow_html=True)
@@ -532,48 +646,97 @@ def filter_doctor_data(doctors_data: List[Dict], city: str) -> List[Dict]:
     
     return filtered_data
 
-# Function to convert DataFrame to Excel
-def to_excel(df):
+def to_excel(df: pd.DataFrame) -> bytes:
+    """Create a well-formatted Excel file with proper styling"""
     output = io.BytesIO()
-    with ExcelWriter(output, engine='xlsxwriter') as writer:
+    
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        # Write the dataframe to Excel
         df.to_excel(writer, sheet_name='Doctors', index=False)
-        # Get the xlsxwriter workbook and worksheet objects
+        
+        # Get the workbook and worksheet objects
         workbook = writer.book
         worksheet = writer.sheets['Doctors']
         
-        # Add a header format
+        # Define formats
         header_format = workbook.add_format({
             'bold': True,
-            'text_wrap': True,
-            'valign': 'top',
-            'fg_color': COLORS['navy_blue'],
+            'bg_color': COLORS['navy_blue'],
             'font_color': 'white',
-            'border': 1
+            'border': 1,
+            'align': 'center',
+            'valign': 'vcenter',
+            'text_wrap': True,
+            'font_size': 11
         })
         
-        # Write the column headers with the defined format
-        for col_num, value in enumerate(df.columns.values):
-            worksheet.write(0, col_num, value, header_format)
-            
+        cell_format = workbook.add_format({
+            'border': 1,
+            'align': 'left',
+            'valign': 'vcenter',
+            'text_wrap': True,
+            'font_size': 10
+        })
+        
         # Set column widths
         worksheet.set_column('A:A', 30)  # Name
-        worksheet.set_column('B:B', 10)  # Rating
-        worksheet.set_column('C:C', 10)  # Reviews
-        worksheet.set_column('D:D', 50)  # Locations
-        worksheet.set_column('E:E', 20)  # Specialization
-        worksheet.set_column('F:F', 15)  # City
-        worksheet.set_column('G:G', 20)  # Contributing Sources
+        worksheet.set_column('B:B', 15)  # Rating
+        worksheet.set_column('C:C', 15)  # Reviews
+        worksheet.set_column('D:D', 40)  # Primary Location
+        worksheet.set_column('E:E', 40)  # Secondary Location
+        worksheet.set_column('F:F', 30)  # Sources
+        worksheet.set_column('G:G', 15)  # Total Locations
         
-        # Add zebra striping
-        for row_num in range(1, len(df) + 1):
-            if row_num % 2 == 0:
-                worksheet.set_row(row_num, None, workbook.add_format({'bg_color': '#f0f0f0'}))
+        # Apply formats to header row
+        for col_num, value in enumerate(df.columns.values):
+            worksheet.write(0, col_num, value, header_format)
+        
+        # Apply formats to data rows
+        for row_num in range(len(df)):
+            for col_num in range(len(df.columns)):
+                worksheet.write(row_num + 1, col_num, df.iloc[row_num, col_num], cell_format)
+        
+        # Add a title
+        title_format = workbook.add_format({
+            'bold': True,
+            'font_size': 14,
+            'align': 'center',
+            'valign': 'vcenter',
+            'font_color': COLORS['navy_blue']
+        })
+        
+        # Add metadata
+        metadata_format = workbook.add_format({
+            'font_size': 10,
+            'align': 'left',
+            'valign': 'vcenter',
+            'font_color': '#666666'
+        })
+        
+        # Add title and metadata
+        worksheet.insert_image('A1', 'logo.png', {'x_scale': 0.5, 'y_scale': 0.5})
+        worksheet.write('A2', 'Doctor Search Results', title_format)
+        worksheet.write('A3', f'Generated on: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}', metadata_format)
+        
+        # Add a footer
+        footer_format = workbook.add_format({
+            'font_size': 9,
+            'align': 'center',
+            'valign': 'vcenter',
+            'font_color': '#666666'
+        })
+        
+        last_row = len(df) + 5
+        worksheet.write(last_row, 0, '© 2024 Supervity. All rights reserved.', footer_format)
+        
+        # Freeze panes
+        worksheet.freeze_panes(5, 0)  # Freeze the header row and first column
     
-    processed_data = output.getvalue()
-    return processed_data
+    output.seek(0)
+    return output.getvalue()
 
 def display_search_results(results: dict):
-    """Display search results in a summary table format with improved UI"""
+    """Display search results in a clean, modern format with improved visual styling"""
     try:
         if not results:
             st.warning("No search results available.")
@@ -585,6 +748,13 @@ def display_search_results(results: dict):
         metadata = results.get('metadata', {})
         
         if not success:
+            # Display error with animation
+            error_lottie = load_lottie_url("https://lottie.host/ae48c1bc-3e83-4e09-89fc-71dfc6fdc51d/rckD4EXxQR.json")
+            if error_lottie:
+                st.markdown('<div style="display: flex; justify-content: center; margin: 1rem 0;">', unsafe_allow_html=True)
+                st_lottie(error_lottie, height=120, key="error")
+                st.markdown('</div>', unsafe_allow_html=True)
+            
             st.error(f"Search failed: {error}")
             return
         
@@ -601,22 +771,27 @@ def display_search_results(results: dict):
             # Use Lottie animation for no results
             no_results_lottie = load_lottie_url("https://lottie.host/be2fa43c-1084-4583-8be6-0d1cd6c41f21/gTzFHlwqak.json")
             if no_results_lottie:
-                st_lottie(no_results_lottie, height=200, key="no_results")
-            
-            st.warning("No qualified doctors found matching your search criteria.")
+                st.markdown('<div style="display: flex; flex-direction: column; align-items: center; justify-content: center; margin: 2rem 0;">', unsafe_allow_html=True)
+                st_lottie(no_results_lottie, height=180, key="no_results")
+                st.markdown('<h3 style="color:#374151; margin-top:1rem; text-align:center;">No qualified doctors found</h3>', unsafe_allow_html=True)
+                st.markdown('<p style="color:#6b7280; text-align:center;">Try a different city or specialization</p>', unsafe_allow_html=True)
+                st.markdown('</div>', unsafe_allow_html=True)
             return
         
-        # Display metadata and search stats with animation
+        # Display results count with nicely formatted icon
         st.markdown(f"""
         <div class="results-count">
-            ✨ Found {len(filtered_data)} verified doctors in {metadata.get('search_duration', 0):.2f} seconds
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                <polyline points="22 4 12 14.01 9 11.01"></polyline>
+            </svg>
+            Found <strong>{len(filtered_data)}</strong> verified doctors in <strong>{metadata.get('search_duration', 0):.2f}</strong> seconds
         </div>
         """, unsafe_allow_html=True)
         
-        # Create download section immediately after results count
-        # Create detailed dataframe for download
+        # Create download section
         try:
-            # Full data with all details
+            # Create a detailed dataframe for download
             df = pd.DataFrame([
                 {
                     'Name': d.get('name', ''),
@@ -625,88 +800,150 @@ def display_search_results(results: dict):
                     'Locations': '; '.join(d.get('locations', [])) if isinstance(d.get('locations'), list) else '',
                     'Specialization': d.get('specialization', ''),
                     'City': d.get('city', ''),
-                    'Contributing Sources': '; '.join(d.get('contributing_sources', [])) if isinstance(d.get('contributing_sources'), list) else ''
+                    'Sources': '; '.join(d.get('contributing_sources', [])) if isinstance(d.get('contributing_sources'), list) else ''
                 } for d in filtered_data
             ])
             
             # Generate Excel file
             excel_data = to_excel(df)
             
-            # Provide download button prominently
+            # Create download button
             st.markdown('<div class="download-section">', unsafe_allow_html=True)
-            st.markdown('<p class="download-title">📥 Download Doctor Information</p>', unsafe_allow_html=True)
+            download_label = f"doctors_{metadata.get('query', {}).get('city', 'city')}_{metadata.get('query', {}).get('specialization', 'specialty')}.xlsx"
             
-            col1, col2, col3 = st.columns([1, 2, 1])
-            with col2:
-                st.download_button(
-                    label="Download as Excel",
-                    data=excel_data,
-                    file_name=f"doctors_{metadata.get('query', {}).get('city', 'city')}_{metadata.get('query', {}).get('specialization', 'specialty')}.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    key="download_excel",
-                    help="Click to download the complete results as an Excel file",
-                    use_container_width=True
-                )
+            st.download_button(
+                label="📥 Download as Excel",
+                data=excel_data,
+                file_name=download_label,
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key="download_excel",
+                help="Download the complete results as an Excel file"
+            )
             
             st.markdown('</div>', unsafe_allow_html=True)
         except Exception as e:
             logger.error(f"Error creating Excel file: {type(e).__name__} - {str(e)}")
             st.error("Error preparing download file.")
         
-        # Sorting options with improved styling
-        st.markdown("<h3 style='color:#000b37;'>Explore Results</h3>", unsafe_allow_html=True)
-        sort_option = st.selectbox(
-            "Sort results by:",
-            options=["Rating (High to Low)", "Reviews (High to Low)"]
-        )
+        # Sorting and filter controls
+        col1, col2 = st.columns([2, 1])
         
-        # Sort data based on selection
+        with col1:
+            st.markdown("<p style='color:#000b37; font-weight:600; margin-bottom:0.5rem;'>Sort By</p>", unsafe_allow_html=True)
+            sort_option = st.radio(
+                "",
+                options=["Rating (High to Low)", "Reviews (High to Low)"],
+                horizontal=True,
+                label_visibility="collapsed"
+            )
+        
+        with col2:
+            min_rating = st.select_slider(
+                "Minimum Rating",
+                options=[0, 3, 3.5, 4, 4.5],
+                value=0
+            )
+        
+        # Sort and filter data
         try:
+            # Filter by rating
+            if min_rating > 0:
+                filtered_data = [
+                    doc for doc in filtered_data 
+                    if isinstance(doc.get('rating'), (int, float, str)) and float(doc.get('rating', 0)) >= min_rating
+                ]
+            
+            # Sort based on selection
             if sort_option == "Rating (High to Low)":
                 sorted_data = sorted(
                     filtered_data, 
                     key=lambda x: (float(x.get('rating', 0)) if isinstance(x.get('rating'), (int, float, str)) else 0, 
-                                   int(x.get('reviews', 0)) if isinstance(x.get('reviews'), (int, float, str)) else 0), 
+                                  int(x.get('reviews', 0)) if isinstance(x.get('reviews'), (int, float, str)) else 0), 
                     reverse=True
                 )
             else:  # Reviews (High to Low)
                 sorted_data = sorted(
                     filtered_data, 
                     key=lambda x: (int(x.get('reviews', 0)) if isinstance(x.get('reviews'), (int, float, str)) else 0, 
-                                   float(x.get('rating', 0)) if isinstance(x.get('rating'), (int, float, str)) else 0), 
+                                  float(x.get('rating', 0)) if isinstance(x.get('rating'), (int, float, str)) else 0), 
                     reverse=True
                 )
+                
+            # Show count after filtering
+            if min_rating > 0 and len(filtered_data) != len(data):
+                st.markdown(f"<p style='color:#6b7280; font-size:0.9rem; margin-top:0.5rem;'>Showing {len(filtered_data)} doctors with {min_rating}+ rating</p>", unsafe_allow_html=True)
+                
         except Exception as e:
             logger.error(f"Error sorting data: {type(e).__name__} - {str(e)}")
             sorted_data = filtered_data  # Use unsorted data if sorting fails
         
+        if not filtered_data:
+            st.warning(f"No doctors found with rating {min_rating}+. Try lowering the minimum rating.")
+            return
+        
         # Create a summary DataFrame for display
         summary_data = []
         for doc in sorted_data:
-            # Create a simplified summary for each doctor
+            # Get primary location
             primary_location = doc.get('locations', ['Not Available'])[0] if doc.get('locations') else 'Not Available'
-            secondary_location = doc.get('locations', ['', 'Not Available'])[1] if len(doc.get('locations', [])) > 1 else 'N/A'
             
-            # Get sources and format them
+            # Get additional locations count
+            additional_locations = len(doc.get('locations', [])) - 1 if len(doc.get('locations', [])) > 1 else 0
+            location_text = primary_location
+            if additional_locations > 0:
+                location_text = f"{primary_location} (+{additional_locations} more)"
+            
+            # Get sources and format them as HTML
             sources = doc.get('contributing_sources', [])
             if isinstance(sources, list):
-                sources_str = ", ".join(sorted(set(src.lower() for src in sources)))
+                sources_html = "".join([f'<span class="source-pill">{src.lower()}</span>' for src in sorted(set(sources))])
             else:
-                sources_str = "N/A"
+                sources_html = "N/A"
             
+            # Format rating with stars
+            rating = float(doc.get('rating', 0)) if isinstance(doc.get('rating'), (int, float, str)) else 0
+            rating_str = f"{rating:.1f} ⭐" if rating > 0 else "N/A"
+            
+            # Add formatted row to summary data
             summary_data.append({
                 'Name': doc.get('name', ''),
-                'Rating': f"{float(doc.get('rating', 0)):.1f}" if isinstance(doc.get('rating'), (int, float, str)) else 'N/A',
-                'Reviews': doc.get('reviews', 0),
-                'Primary Location': primary_location,
-                'Secondary Location': secondary_location,
-                'Sources': sources_str,
-                'Total Locations': len(doc.get('locations', []))
+                'Rating': rating_str,
+                'Reviews': f"{doc.get('reviews', 0):,}" if doc.get('reviews', 0) else "N/A",
+                'Location': location_text,
+                'Sources': sources_html
             })
         
         # Create DataFrame and display as table with improved styling
         summary_df = pd.DataFrame(summary_data)
-        st.dataframe(summary_df, use_container_width=True)
+        
+        # Configure column display with HTML rendering for Sources
+        st.dataframe(
+            summary_df,
+            use_container_width=True,
+            column_config={
+                'Name': st.column_config.TextColumn(
+                    'Doctor Name',
+                    width='large'
+                ),
+                'Rating': st.column_config.TextColumn(
+                    'Rating',
+                    width='small'
+                ),
+                'Reviews': st.column_config.TextColumn(
+                    'Reviews',
+                    width='small'
+                ),
+                'Location': st.column_config.TextColumn(
+                    'Location',
+                    width='large'
+                ),
+                'Sources': st.column_config.HTMLColumn(
+                    'Contributing Sources',
+                    width='medium'
+                )
+            },
+            hide_index=True
+        )
         
     except Exception as e:
         logger.error(f"Error displaying search results: {type(e).__name__} - {str(e)}")
@@ -730,70 +967,85 @@ def main():
     # Display Supervity logo
     logo = load_logo()
     if logo:
-        col1, col2, col3 = st.columns([1, 2, 1])
-        with col2:
-            st.image(logo, width=50, use_container_width=True)
+        st.markdown('<div class="logo-container">', unsafe_allow_html=True)
+        st.image(logo, use_container_width=False)
+        st.markdown('</div>', unsafe_allow_html=True)
     else:
         st.markdown('<div class="logo-container">', unsafe_allow_html=True)
-        st.markdown(f'<h2 style="color:{COLORS["navy_blue"]}; text-align:center;">Supervity</h2>', unsafe_allow_html=True)
+        st.markdown(f'<h3 style="color:{COLORS["navy_blue"]};">Supervity</h3>', unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
     
     # Page title and intro with animations
     st.markdown('<h1 class="title">Find the Best Doctors</h1>', unsafe_allow_html=True)
     st.markdown('<p class="subtitle">Search across multiple platforms to discover qualified doctors in your city</p>', unsafe_allow_html=True)
     
-    # Wrap search form in a container with styling
-    st.markdown('<div class="search-form">', unsafe_allow_html=True)
+    # Main search container with vertical flow
+    st.markdown('<div class="search-container">', unsafe_allow_html=True)
+    st.markdown('<h2 class="search-title">Start Your Search</h2>', unsafe_allow_html=True)
     
-    # Create columns layout for the search form
-    col1, col2 = st.columns(2)
+    # City input section - full width
+    st.markdown('<p class="input-label">Enter City</p>', unsafe_allow_html=True)
+    city = st.text_input(
+        "",  # Empty label since we use custom label above
+        placeholder="e.g., Mumbai, Delhi, Bangalore",
+        help="Enter the city where you want to find doctors"
+    )
     
-    with col1:
-        # City input with placeholder and help text
-        city = st.text_input(
-            "City", 
-            placeholder="e.g., Mumbai, Delhi, Bangalore",
-            help="Enter the city where you want to find doctors"
+    # Specialization section
+    st.markdown('<div class="spec-section">', unsafe_allow_html=True)
+    st.markdown('<p class="input-label">Select Specialization</p>', unsafe_allow_html=True)
+    
+    # Initialize session state for specialization if not exists
+    if 'selected_specialization' not in st.session_state:
+        st.session_state.selected_specialization = None
+    if 'custom_spec_input' not in st.session_state:
+        st.session_state.custom_spec_input = ""
+    
+    # Create a grid of specialization buttons (4 columns)
+    cols = st.columns(4)
+    for idx, spec in enumerate(POPULAR_SPECIALIZATIONS):
+        with cols[idx % 4]:
+            # Create clickable buttons with appropriate styling
+            if st.button(
+                spec,
+                key=f"spec_{idx}",
+                use_container_width=True,
+                type="primary" if st.session_state.selected_specialization == spec else "secondary"
+            ):
+                st.session_state.selected_specialization = spec
+                if spec != "Other (Custom)":
+                    st.session_state.custom_spec_input = ""
+                st.rerun()
+    
+    # Show custom input if "Other (Custom)" is selected
+    if st.session_state.selected_specialization == "Other (Custom)":
+        st.markdown('<div class="custom-spec-container">', unsafe_allow_html=True)
+        custom_spec = st.text_input(
+            "Enter Custom Specialization",
+            value=st.session_state.custom_spec_input,
+            placeholder="e.g., Sports Medicine, Pain Management",
+            help="Type a specific medical specialization"
         )
+        if custom_spec:
+            st.session_state.custom_spec_input = custom_spec
+        st.markdown('</div>', unsafe_allow_html=True)
     
-    with col2:
-        # Add option to use predefined or custom specialization
-        specialization_type = st.radio(
-            "Specialization Type",
-            options=["Choose from list", "Enter custom"],
-            horizontal=True
-        )
-        
-        if specialization_type == "Choose from list":
-            # Specialization selection from predefined list
-            specialization = st.selectbox(
-                "Specialization", 
-                options=list(specializations.values()),
-                help="Select the type of doctor you're looking for"
-            )
-        else:
-            # Custom specialization input
-            specialization = st.text_input(
-                "Enter Custom Specialization", 
-                placeholder="e.g., Sports Medicine, Pain Management",
-                help="Type a specific medical specialization"
-            )
+    st.markdown('</div>', unsafe_allow_html=True)  # Close spec-section
     
-    # Search button in a centered column with animation
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
-        search_button = st.button("Search Doctors", use_container_width=True)
-        
-        # Add note about custom specializations
-        if specialization_type == "Enter custom":
-            st.markdown(
-                "<div class='custom-specialization'>Note: Custom specializations may return fewer or less accurate results "
-                "than our predefined list, as they depend on how commonly they appear in our data sources.</div>", 
-                unsafe_allow_html=True
-            )
+    # Determine if search can be performed
+    can_search = bool(city and (
+        (st.session_state.selected_specialization and st.session_state.selected_specialization != "Other (Custom)") or
+        (st.session_state.selected_specialization == "Other (Custom)" and st.session_state.custom_spec_input)
+    )) and not st.session_state.get('is_searching', False)
     
-    # Close the search form container
-    st.markdown('</div>', unsafe_allow_html=True)
+    # Search button - centered
+    search_button = st.button(
+        "Search Doctors 🔍",
+        disabled=not can_search,
+        use_container_width=False
+    )
+    
+    st.markdown('</div>', unsafe_allow_html=True)  # Close search-container
     
     # Initialize session state if not already done
     if 'search_results' not in st.session_state:
@@ -802,48 +1054,11 @@ def main():
         st.session_state.is_searching = False
     if 'error' not in st.session_state:
         st.session_state.error = None
-    if 'debug_mode' not in st.session_state:
-        st.session_state.debug_mode = False
-    
-    # Add a debug toggle in the sidebar
-    with st.sidebar:
-        st.markdown('<div style="display:flex; justify-content:center; margin-bottom:20px;">', unsafe_allow_html=True)
-        if logo:
-            st.image(logo, width=60)
-        else:
-            st.markdown(f'<h3 style="color:white; text-align:center;">Supervity</h3>', unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
-        
-        st.markdown(f"<h3 style='color:white;'>Search Tips</h3>", unsafe_allow_html=True)
-        st.markdown(
-            "<div style='color:white;'>"
-            "- For more results, try different cities nearby your location<br>"
-            "- Some specializations may have more doctors in certain cities<br>"
-            "- Results are filtered to ensure only doctors with verified locations are shown<br>"
-            "- Use custom specialization for specific needs"
-            "</div>",
-            unsafe_allow_html=True
-        )
-        
-        # Add collapsible about section
-        with st.expander("About Supervity", expanded=False):
-            st.markdown(
-                "<div style='color:white;'>"
-                "Supervity helps you find verified doctors across multiple platforms. "
-                "Our advanced search algorithms ensure you get the most relevant results "
-                "specific to your city and medical needs."
-                "</div>",
-                unsafe_allow_html=True
-            )
-        
-        if 'debug_mode' not in st.session_state:
-            st.session_state.debug_mode = False
-        st.session_state.debug_mode = st.checkbox("Debug Mode", value=st.session_state.debug_mode)
     
     # Handle search button click
     if search_button:
         # Validate inputs
-        if not city or not specialization:
+        if not city or not st.session_state.selected_specialization:
             st.error("Please enter both city and specialization")
         else:
             try:
@@ -851,13 +1066,28 @@ def main():
                 st.session_state.is_searching = True
                 st.session_state.error = None
                 
-                # Show searching message with a nice animation
-                with st.spinner(f"Searching for {specialization} in {city}..."):
+                # Determine the final specialization query
+                final_specialization = (
+                    st.session_state.custom_spec_input
+                    if st.session_state.selected_specialization == "Other (Custom)"
+                    else st.session_state.selected_specialization
+                )
+                
+                # Show searching animation and message
+                searching_lottie = load_lottie_url("https://lottie.host/6dbcad90-b4ca-45f4-b8a1-4eb34c634d87/jkoWAGLSQT.json")
+                if searching_lottie:
+                    st.markdown('<div class="loading-container">', unsafe_allow_html=True)
+                    st_lottie(searching_lottie, height=150, key="searching")
+                    st.markdown(f'<p class="loading-text">Searching for {final_specialization} in {city}...</p>', unsafe_allow_html=True)
+                    st.markdown('</div>', unsafe_allow_html=True)
+                
+                # Call the search function
+                with st.spinner():
                     # Add a slight delay for visual effect
                     time.sleep(0.5)
                     
-                    # Call the search function
-                    results = run_async(search_doctors(city, specialization))
+                    # Make the API call
+                    results = run_async(search_doctors(city, final_specialization))
                     
                     # Store results in session state
                     st.session_state.search_results = results
@@ -885,20 +1115,15 @@ def main():
     
     # Display search results if available
     if st.session_state.search_results:
+        st.markdown('<div class="results-section">', unsafe_allow_html=True)
         display_search_results(st.session_state.search_results)
-        
-        # Display debug information if debug mode is enabled
-        if st.session_state.debug_mode:
-            st.markdown("### Debug Information")
-            st.markdown('<div class="debug-info">', unsafe_allow_html=True)
-            st.json(st.session_state.search_results)
-            st.markdown('</div>', unsafe_allow_html=True)
-    else:
+        st.markdown('</div>', unsafe_allow_html=True)
+    elif not st.session_state.is_searching:
         # Show welcome animation when no search has been performed yet
         welcome_lottie = load_lottie_url("https://lottie.host/c9cc25ba-fe8a-422a-b735-1611399e3b3b/zNvxQpVgN3.json")
         if welcome_lottie:
             st.markdown('<div style="display: flex; justify-content: center; margin: 2rem 0;">', unsafe_allow_html=True)
-            st_lottie(welcome_lottie, height=300, key="welcome")
+            st_lottie(welcome_lottie, height=250, key="welcome")
             st.markdown('</div>', unsafe_allow_html=True)
 
 if __name__ == "__main__":
