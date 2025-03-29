@@ -9,8 +9,8 @@ from typing import List, Dict, Optional, Any
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from google import genai
-from google.genai import types
+import google.generativeai as genai
+from google.generativeai import types
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field, validator
 from fuzzywuzzy import fuzz
