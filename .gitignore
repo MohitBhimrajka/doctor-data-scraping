@@ -24,7 +24,6 @@ wheels/
 venv/
 env/
 ENV/
-.env
 
 # IDE
 .idea/
@@ -32,14 +31,27 @@ ENV/
 *.swp
 *.swo
 
-# Project specific
-*.db
+# Logs
+logs/
 *.log
-*.sqlite3
-doctor_search.log
-streamlit_app.log
-doctors.db
 
-# OS specific
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Database
+*.db
+*.sqlite3
+
+# OS
 .DS_Store
-Thumbs.db 
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Application specific
+streamlit-frontend/streamlit_app.log 

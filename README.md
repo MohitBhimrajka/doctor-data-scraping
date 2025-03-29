@@ -1,28 +1,32 @@
 # Doctor Search Application
 
-A modern web application for searching and finding doctors across multiple sources, built with Next.js, FastAPI, and the Gemini API.
+A modern web application for searching and finding doctors across multiple sources, built with FastAPI, Streamlit, and the Gemini API.
 
 ## Project Structure
 
 ```
 doctor-data-scraping/
-├── doctor-search-ui/           # Frontend Next.js application
-│   ├── app/                    # Next.js app directory
-│   │   ├── api/               # API routes
-│   │   └── page.tsx           # Main page component
-│   ├── types/                 # TypeScript type definitions
-│   ├── public/                # Static assets
-│   └── tailwind.config.ts     # Tailwind CSS configuration
+├── streamlit-frontend/         # Frontend Streamlit application
+│   ├── app_streamlit.py        # Main Streamlit application
+│   ├── requirements.txt        # Frontend dependencies
+│   ├── .env                    # Environment variables
+│   └── assets/                 # Image assets
+│       ├── Supervity_Black_Without_Background.png
+│       └── Supervity_Icon.png
+├── logs/                      # Application logs directory
 ├── doctor_search_enhanced.py   # Core search functionality
-├── server.py                  # FastAPI backend server
-└── requirements.txt           # Python dependencies
+├── server.py                   # FastAPI backend server
+├── requirements.txt            # Backend Python dependencies
+├── run_app.sh                  # Script to run both frontend and backend
+├── .env                       # Root environment variables
+└── GEMINI_API_KEY_GUIDE.md    # Guide for obtaining API key
 ```
 
 ## Features
 
 - 🔍 Search doctors by city and specialization
-- 📊 Real-time search progress tracking
-- ⭐ Sort results by rating, reviews, or name
+- 📊 Clean and intuitive user interface
+- ⭐ Display results with ratings and reviews
 - 📥 Export results to CSV
 - 🎨 Modern UI with Supervity brand colors
 - 🔄 Asynchronous processing for better performance
@@ -30,10 +34,10 @@ doctor-data-scraping/
 ## Technology Stack
 
 ### Frontend
-- Next.js 14
-- TypeScript
-- Tailwind CSS
-- React Hooks
+- Streamlit
+- Python 3.8+
+- Pandas
+- httpx
 
 ### Backend
 - FastAPI
@@ -44,15 +48,21 @@ doctor-data-scraping/
 ## Setup
 
 ### Prerequisites
-- Node.js 18+
 - Python 3.8+
-- Google Gemini API Key
+- Google Gemini API Key (required for the backend to work)
 
 ### Environment Variables
 Create a `.env` file in the root directory:
 ```env
-GEMINI_API_KEY=your_api_key_here
+# Required - obtain your API key from https://ai.google.dev/
+GEMINI_API_KEY=your_gemini_api_key_here  
+
+# Other configuration
+FRONTEND_URL=http://localhost:8501
+BACKEND_API_URL=http://localhost:8000
 ```
+
+⚠️ **Important**: You must replace `your_gemini_api_key_here` with your actual Gemini API key, or the application will not work.
 
 ### Backend Setup
 1. Create and activate a virtual environment:
@@ -75,19 +85,25 @@ The server will run on http://localhost:8000
 ### Frontend Setup
 1. Navigate to the frontend directory:
 ```bash
-cd doctor-search-ui
+cd streamlit-frontend
 ```
 
 2. Install dependencies:
 ```bash
-npm install
+pip install -r requirements.txt
 ```
 
-3. Start the development server:
+3. Start the Streamlit server:
 ```bash
-npm run dev
+streamlit run app_streamlit.py
 ```
-The application will be available at http://localhost:3000
+The application will be available at http://localhost:8501
+
+### Running Both Services Together
+For convenience, you can use the provided shell script to run both the backend and frontend:
+```bash
+./run_app.sh
+```
 
 ## API Endpoints
 
@@ -104,19 +120,42 @@ Request body:
 
 Response:
 ```json
-[
-  {
-    "name": "string",
-    "rating": number,
-    "reviews": number,
-    "locations": ["string"],
-    "source": "string",
-    "specialization": "string",
-    "city": "string",
-    "timestamp": "string"
+{
+  "success": true,
+  "data": [
+    {
+      "name": "string",
+      "rating": number,
+      "reviews": number,
+      "locations": ["string"],
+      "source": "string",
+      "specialization": "string",
+      "city": "string",
+      "timestamp": "string"
+    }
+  ],
+  "metadata": {
+    "total": number,
+    "timestamp": "string",
+    "query": {
+      "city": "string",
+      "specialization": "string"
+    }
   }
-]
+}
 ```
+
+## Troubleshooting
+
+### Common Issues
+
+1. **"Configuration validation failed" error**:
+   - Make sure you have set a valid `GEMINI_API_KEY` in your `.env` file
+   - Ensure the API key has proper permissions and hasn't expired
+
+2. **Backend connection issues from frontend**:
+   - Verify the backend is running
+   - Check that `BACKEND_API_URL` in the frontend's `.env` matches where the backend is running
 
 ## Data Sources
 The application searches across multiple sources:
@@ -137,5 +176,5 @@ MIT License
 
 ## Acknowledgments
 - Google Gemini API for search capabilities
-- Next.js team for the amazing framework
-- FastAPI team for the efficient backend framework 
+- FastAPI team for the efficient backend framework
+- Streamlit team for the intuitive UI framework 
