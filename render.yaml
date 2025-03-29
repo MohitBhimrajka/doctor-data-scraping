@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: doctor-search-api
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: ./start.sh
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: GOOGLE_API_KEY
+        sync: false
+      - key: FRONTEND_URL
+        value: https://doctor-search-ui.onrender.com 
