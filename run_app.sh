@@ -38,20 +38,13 @@ VENV_DIR="venv"
 TEST_DIR="tests"
 mkdir -p $TEST_DIR
 
-# Check if doctors.db exists and prompt for deletion
+# Automatically delete and recreate the database 
 if [ -f "doctors.db" ]; then
-    print_message "YELLOW" "WARNING: An existing doctors.db file was detected."
-    print_message "YELLOW" "If you've updated the application code and the database schema has changed,"
-    print_message "YELLOW" "you should delete this file to avoid database schema errors."
-    
-    read -p "Do you want to delete the existing doctors.db file? (y/n): " -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        rm doctors.db
-        print_message "GREEN" "doctors.db has been deleted. A new database will be created when you run the application."
-    else
-        print_message "YELLOW" "Keeping existing doctors.db file. Note that this may cause errors if the schema has changed."
-    fi
+    print_message "YELLOW" "Detected existing doctors.db file. Deleting for a fresh start..."
+    rm doctors.db
+    print_message "GREEN" "doctors.db has been deleted. A new database will be created when you run the application."
+else
+    print_message "BLUE" "No existing database found. A new one will be created."
 fi
 
 # Create virtual environment if it doesn't exist
@@ -171,7 +164,7 @@ async def test_doctor_prompt():
     
     # Create a simple search prompt
     prompt = PromptManager._add_json_instruction(
-        "site:practo.com Dermatologist doctor in Mumbai rating reviews phone number address"
+        "site:practo.com Dermatologist doctor primarily practicing in Mumbai clinic address rating reviews"
     )
     
     print(f"Testing doctor search prompt...")

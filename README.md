@@ -8,6 +8,7 @@ A streamlined web application for finding doctors with core information (name, r
 doctor-data-scraping/
 ├── streamlit-frontend/         # Frontend Streamlit application
 │   ├── app_streamlit.py        # Main Streamlit application
+│   ├── assets/                 # Branding assets (logos, icons)
 │   └── .env                    # Frontend environment variables
 ├── logs/                       # Application logs directory
 ├── doctor_search_enhanced.py   # Core search functionality
@@ -23,17 +24,21 @@ doctor-data-scraping/
 - 🔍 Search doctors by city and specialization
 - 📱 Access core information: name, rating, reviews, and accurate locations
 - 🚀 High throughput data collection through optimized Gemini API usage
+- 🎨 Modern and responsive UI with animations and Supervity branding
 - 📊 Clean and intuitive user interface
-- 📥 Export results to CSV or JSON
+- 📤 Export results to Excel with professional formatting
 - 🔄 Asynchronous processing for better performance
+- ✨ Smart validation for rare specialists and location detection
 
 ## Technology Stack
 
 ### Frontend
-- Streamlit
+- Streamlit with custom CSS and animations
+- Streamlit-Lottie for engaging animations
 - Python 3.8+
 - Pandas
-- httpx
+- XlsxWriter for Excel export
+- httpx for async API calls
 
 ### Backend
 - FastAPI
@@ -73,7 +78,24 @@ pip install -r requirements.txt
 ./run_app.sh
 ```
 
+The script will automatically:
+- Delete any existing database to ensure schema consistency
+- Set up the environment
+- Install dependencies
+- Run validation tests
+- Start both the backend and frontend services
+
 The backend will run on http://localhost:8000 and the frontend will be available at http://localhost:8501
+
+### Branding Customization
+
+To customize the Supervity branding:
+
+1. Add your logo files to the `streamlit-frontend/` directory:
+   - `logo.png` - For the main application logo
+   - `icon.png` - For the browser tab favicon
+
+The application is configured with Supervity's brand colors (primary: #000b37).
 
 ## API Endpoints
 
@@ -117,25 +139,45 @@ Response:
 }
 ```
 
+## UI Features
+
+### Enhanced User Experience
+- **Animations**: Smooth transitions and loading animations
+- **Branding**: Consistent Supervity branding throughout the application
+- **Responsive Design**: Adapts to different screen sizes
+- **Visual Feedback**: Clear indicators for search progress and results
+
+### Search Capabilities
+- **Predefined Specializations**: Choose from a curated list of medical specialties
+- **Custom Specializations**: Enter specific medical fields not in the predefined list
+- **Smart Results**: Intelligent filtering of results to provide the most relevant doctors
+
+### Results Display
+- **Sortable Data**: Sort doctors by rating or number of reviews
+- **Detailed Information**: View primary and secondary practice locations
+- **Source Tracking**: See which sources contributed to each doctor's information
+
+### Excel Export
+- **Professional Formatting**: Branded Excel exports with proper formatting
+- **Comprehensive Data**: All doctor details included in the export file
+- **One-Click Download**: Prominently displayed download button
+
 ## Troubleshooting
 
 ### Database Schema Errors
 
-If you see an error such as:
+The application now automatically deletes and recreates the database when you run `run_app.sh`, so database schema errors should be eliminated.
+
+If you're running the components individually and see an error such as:
 ```
 ERROR - Search error: table doctors has no column named locations
 ```
 
-This indicates a mismatch between the database schema defined in the code and the actual structure of the `doctors.db` file. The application uses SQLite with a `CREATE TABLE IF NOT EXISTS` statement which won't modify an existing table structure.
-
-**Solution**: Delete the existing `doctors.db` file. A new database with the correct schema will be created automatically when you run the application again.
-
+Simply delete the existing `doctors.db` file:
 ```bash
 # From the project root directory
 rm doctors.db
 ```
-
-The updated `run_app.sh` script will detect if `doctors.db` exists and prompt you to delete it if necessary.
 
 ### API Connection Issues
 
@@ -153,6 +195,14 @@ If your search completes but returns no doctors:
 2. Check the logs for any specific errors during the search process
 3. Try a different combination of city and specialization
 4. Check the Google API key validity and quota limits
+
+### Missing Animations or UI Elements
+
+If some UI elements or animations are not displaying correctly:
+
+1. Ensure all dependencies were installed correctly
+2. Check that you have internet access (some animations load from external sources)
+3. Verify that your browser supports the CSS animations used
 
 ## Data Sources
 The application searches across multiple sources:

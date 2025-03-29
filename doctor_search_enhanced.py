@@ -49,7 +49,7 @@ class Config:
     MAX_RATING: float = 5.0
     FUZZY_MATCH_THRESHOLD: int = 85
     DB_PATH: str = "doctors.db"
-    MAX_CONCURRENT_REQUESTS: int = 200  # Significantly increased for better parallelization
+    MAX_CONCURRENT_REQUESTS: int = 300  # Increased for better parallelization and more results
     REQUEST_TIMEOUT: float = 30.0  # Timeout for each request in seconds
 
     def validate(self) -> bool:
@@ -77,13 +77,46 @@ class Doctor(BaseModel):
 
     def merge_with(self, other: 'Doctor') -> None:
         """Merge data from another doctor record into this one"""
-        # Add contributing sources 
+        # Add contributing sources - avoid duplicates and ensure we only have valid source names
+        valid_sources = ["practo", "justdial", "general", "hospital", "social"]
+        
+        # Clean up existing sources
+        self.contributing_sources = [src.lower().strip() for src in self.contributing_sources 
+                                    if src.lower().strip() in valid_sources]
+        
+        # Add new sources from other doctor
         for source in other.contributing_sources:
-            if source not in self.contributing_sources:
+            source = source.lower().strip()
+            if source in valid_sources and source not in self.contributing_sources:
                 self.contributing_sources.append(source)
         
-        # Merge locations
-        self.locations.extend([loc for loc in other.locations if loc not in self.locations])
+        # Merge locations - avoid duplicates and try to keep quality data
+        # First clean up locations to normalize them
+        cleaned_other_locations = []
+        for loc in other.locations:
+            # Skip very short or generic locations
+            if len(loc) < 5 or any(term in loc.lower() for term in ["multiple locations", "online", "consultation"]):
+                continue
+            cleaned_other_locations.append(loc)
+        
+        # Add new unique locations
+        for loc in cleaned_other_locations:
+            # Check if this location is already covered by an existing one
+            should_add = True
+            for existing_loc in self.locations:
+                similarity = fuzz.partial_ratio(loc.lower(), existing_loc.lower())
+                if similarity >= 85:  # High threshold to avoid merging different but similar locations
+                    # If they're very similar but the new one is more detailed, replace the existing one
+                    if len(loc) > len(existing_loc) * 1.5:  # Significantly more detailed
+                        self.locations.remove(existing_loc)
+                        should_add = True
+                        break
+                    else:
+                        should_add = False
+                        break
+            
+            if should_add and loc not in self.locations:
+                self.locations.append(loc)
         
         # Update rating and reviews if the other record has more reviews
         if other.reviews > self.reviews:
@@ -322,10 +355,12 @@ class DataProcessor:
             return None
 
     @staticmethod
-    def is_location_in_city(location: str, city: str) -> bool:
+    def is_location_in_city(location: str, city: str, specialization: str = None) -> bool:
         """
         Check if a location is likely in the specified city.
         Returns True if the location appears to be in the city, False otherwise.
+        Uses a more sophisticated approach to handle common location types.
+        For rare specialists, applies more lenient validation to increase result count.
         """
         if not location or not city:
             return False
@@ -334,39 +369,116 @@ class DataProcessor:
         location_lower = location.lower()
         city_lower = city.lower()
         
-        # Check if city name is in the location
-        if city_lower in location_lower:
-            return True
-            
-        # List of major cities (case insensitive) to check against
-        major_cities = ["delhi", "mumbai", "bangalore", "bengaluru", "chennai", "kolkata", 
-                        "hyderabad", "pune", "ahmedabad", "jaipur", "lucknow", "kanpur", 
-                        "nagpur", "indore", "thane", "bhopal", "visakhapatnam", "patna"]
-        
-        # If another major city is mentioned (and it's not the requested city)
-        for other_city in major_cities:
-            if other_city != city_lower and other_city in location_lower:
-                # Check if it's mentioning travel/visit to other city
-                travel_indicators = ["visit", "travels to", "also available in", "consultation in"]
-                for indicator in travel_indicators:
-                    if indicator in location_lower:
-                        # This indicates the doctor might still be primarily in the requested city
-                        return True
-                # No travel indicators but another city mentioned
-                return False
-                
-        # Check for generic/non-specific location terms
+        # Skip extremely generic locations
         generic_locations = [
-            "multiple locations", "available online", "teleconsultation", 
-            "consultation available", "multiple branches", "across india",
-            "pan india", "all over india", "all major cities"
+            "multiple locations", "available online", "teleconsultation", "tele consultation",
+            "consultation available", "multiple branches", "across india", "pan india", 
+            "all over india", "all major cities", "tele medicine", "available for video consultation",
+            "online consultation", "virtual consultation", "many locations", "visiting consultant",
+            "all over", "available at", "visit for consultation"
         ]
         
-        for generic in generic_locations:
-            if generic in location_lower:
+        # For very specific/rare specializations, we're more lenient with generic locations
+        rare_specialties = [
+            "neurologist", "endocrinologist", "rheumatologist", "hematologist", 
+            "nephrologist", "oncologist", "radiologist", "gastroenterologist"
+        ]
+        is_rare_specialty = specialization and specialization.lower() in rare_specialties
+        
+        # If it's a rare specialty, only skip the most generic locations
+        if is_rare_specialty:
+            # Use a more limited list of generic locations to filter out
+            very_generic = ["across india", "pan india", "all over india", "all major cities"]
+            if any(generic in location_lower for generic in very_generic):
                 return False
+        else:
+            # For common specialties, apply stricter filtering
+            if any(generic in location_lower for generic in generic_locations):
+                return False
+        
+        # City variants - account for common ways to refer to the same city
+        city_variants = {
+            "delhi": ["delhi", "new delhi", "delhi ncr", "ncr"],
+            "mumbai": ["mumbai", "bombay", "navi mumbai", "thane"],
+            "bangalore": ["bangalore", "bengaluru"],
+            "hyderabad": ["hyderabad", "secunderabad"],
+            "chennai": ["chennai", "madras"],
+            "kolkata": ["kolkata", "calcutta"],
+            "pune": ["pune"],
+            "ahmedabad": ["ahmedabad"],
+            "jaipur": ["jaipur"],
+            "lucknow": ["lucknow"],
+            "chandigarh": ["chandigarh"],
+            "gurgaon": ["gurgaon", "gurugram"]
+        }
+        
+        # Get variants for the requested city
+        requested_city_variants = []
+        for city_key, variants in city_variants.items():
+            if city_lower in variants:
+                requested_city_variants = variants
+                break
+        
+        if not requested_city_variants:
+            requested_city_variants = [city_lower]
+        
+        # Check if any of the city variants appear in the location
+        for variant in requested_city_variants:
+            if variant in location_lower:
+                return True
                 
-        # If we've reached here and no other city is mentioned, assume it's in the requested city
+        # If the city is Delhi, also check for Delhi NCR cities
+        if city_lower == "delhi":
+            ncr_cities = ["gurgaon", "gurugram", "noida", "faridabad", "ghaziabad"]
+            for ncr_city in ncr_cities:
+                if ncr_city in location_lower:
+                    # For Delhi, we'll accept NCR cities
+                    return True
+                    
+        # Handle special case for Delhi NCR region
+        if "delhi ncr" in location_lower or "ncr" in location_lower:
+            if city_lower == "delhi":
+                return True
+        
+        # For rare specialties, we're more lenient with locations in other cities
+        # as these doctors may travel between cities or have limited practitioners
+        if is_rare_specialty:
+            # If it's a hospital or medical center name without clear city indication,
+            # accept it for rare specialists
+            medical_indicators = ["hospital", "clinic", "medical", "healthcare", "centre", "center"]
+            if any(indicator in location_lower for indicator in medical_indicators):
+                # If it looks like a medical facility without obvious city conflicts, accept it
+                return True
+                
+        # If another non-NCR city is mentioned and it's not the requested city
+        for city_key, variants in city_variants.items():
+            # Skip if this is the requested city
+            if city_lower in variants:
+                continue
+                
+            # If we're looking for Delhi, we accept NCR cities, so skip checking those
+            if city_lower == "delhi" and city_key in ["gurgaon"]:
+                continue
+                
+            # If this city variant appears in the location
+            for variant in variants:
+                if variant in location_lower:
+                    # Check if it's mentioning travel/visit to this city
+                    travel_indicators = ["visit", "travels to", "also available in", "consultation in"]
+                    if any(indicator in location_lower for indicator in travel_indicators):
+                        # This indicates the doctor might still be primarily in the requested city
+                        continue
+                    
+                    # For rare specialists, allow some flexibility if they appear to 
+                    # practice in multiple cities
+                    if is_rare_specialty and "also" in location_lower:
+                        continue
+                        
+                    # No travel indicators but another city mentioned
+                    return False
+        
+        # If the location doesn't contain the city but doesn't have any conflicting cities either,
+        # we'll accept it, assuming it's a specific location (like hospital/clinic name) within the city
         return True
 
     @staticmethod
@@ -377,6 +489,12 @@ class DataProcessor:
         Apply strict location validation
         """
         standardized_doctors = []
+        
+        # Normalize source name to ensure consistency
+        normalized_source = source.lower().strip()
+        valid_sources = ["practo", "justdial", "general", "hospital", "social"]
+        if normalized_source not in valid_sources:
+            normalized_source = "general"
         
         for item in data:
             try:
@@ -436,7 +554,7 @@ class DataProcessor:
                         # Keep only reasonable length locations (not too short, not too long)
                         if 3 < len(loc) < 150 and loc not in cleaned_locations:
                             # Check if this location is likely in the specified city
-                            if DataProcessor.is_location_in_city(loc, city):
+                            if DataProcessor.is_location_in_city(loc, city, specialization):
                                 cleaned_locations.append(loc)
                                 valid_location_found = True
                 
@@ -452,7 +570,7 @@ class DataProcessor:
                     locations=cleaned_locations,
                     specialization=specialization,
                     city=city,
-                    contributing_sources=[source]
+                    contributing_sources=[normalized_source]
                 )
                 
                 standardized_doctors.append(doctor)
@@ -467,13 +585,14 @@ class DataProcessor:
     def deduplicate_doctors(doctors: List[Doctor], threshold: int) -> List[Doctor]:
         """
         Deduplicate doctors based on name similarity and location context
-        Only merge if they have similar locations
+        Only merge if they have similar locations or appear to be the same person
+        Uses a more sophisticated approach to handle common cases of duplication
         """
         if not doctors:
             return []
         
-        # Sort doctors by rating (highest first) to prioritize better profiles
-        sorted_doctors = sorted(doctors, key=lambda x: (x.rating, x.reviews), reverse=True)
+        # Sort doctors by rating (highest first) and then by number of reviews to prioritize better profiles
+        sorted_doctors = sorted(doctors, key=lambda x: (x.rating, x.reviews, len(x.locations)), reverse=True)
         
         # Use first doctor as seed for the result list
         result = [sorted_doctors[0]]
@@ -481,37 +600,101 @@ class DataProcessor:
         # Compare each doctor to those already in the result
         for current in sorted_doctors[1:]:
             is_duplicate = False
+            best_match_idx = -1
+            best_match_score = 0
             
             for idx, existing in enumerate(result):
-                # Compare names for similarity
-                name_similarity = fuzz.ratio(current.name.lower(), existing.name.lower())
+                # Compare names for similarity - case insensitive and normalize spaces
+                current_name = ' '.join(current.name.lower().split())
+                existing_name = ' '.join(existing.name.lower().split())
                 
-                if name_similarity >= threshold:
-                    # Check if locations are compatible before merging
-                    location_compatible = False
-                    
+                # Direct match - definitely the same doctor
+                if current_name == existing_name:
+                    best_match_idx = idx
+                    best_match_score = 100
+                    break
+                
+                # Check for prefix matches (e.g., "Dr. John Smith" vs "John Smith")
+                # Remove common prefixes for comparison
+                prefixes = ["dr.", "dr ", "prof.", "prof ", "professor"]
+                clean_current = current_name
+                clean_existing = existing_name
+                
+                for prefix in prefixes:
+                    if clean_current.startswith(prefix):
+                        clean_current = clean_current[len(prefix):].strip()
+                    if clean_existing.startswith(prefix):
+                        clean_existing = clean_existing[len(prefix):].strip()
+                
+                # After removing prefixes, check for exact match
+                if clean_current == clean_existing:
+                    best_match_idx = idx
+                    best_match_score = 100
+                    break
+                
+                # Use fuzzy matching for more complex cases
+                name_similarity = fuzz.ratio(clean_current, clean_existing)
+                
+                # Only consider it a potential match if similarity is above threshold
+                if name_similarity >= threshold and name_similarity > best_match_score:
+                    # For high similarity matches, check if specialization and city match
+                    if current.specialization == existing.specialization and current.city == existing.city:
+                        best_match_idx = idx
+                        best_match_score = name_similarity
+            
+            # If we found a match, determine if we should merge
+            if best_match_idx >= 0:
+                existing = result[best_match_idx]
+                merge_compatible = False
+                
+                # Case 1: Perfect name match - always merge
+                if best_match_score == 100:
+                    merge_compatible = True
+                # Case 2: High similarity match - check location compatibility
+                elif best_match_score >= threshold + 10:  # Higher threshold for location check
                     # If either has no locations, assume compatible
                     if not current.locations or not existing.locations:
-                        location_compatible = True
+                        merge_compatible = True
                     else:
                         # Check if at least one location from each doctor seems similar
                         for curr_loc in current.locations:
+                            curr_loc_lower = curr_loc.lower()
                             for exist_loc in existing.locations:
-                                loc_similarity = fuzz.partial_ratio(curr_loc.lower(), exist_loc.lower())
-                                if loc_similarity >= 70:  # Threshold for location similarity
-                                    location_compatible = True
+                                exist_loc_lower = exist_loc.lower()
+                                
+                                # Look for common identifiable segments in locations
+                                loc_similarity = fuzz.partial_ratio(curr_loc_lower, exist_loc_lower)
+                                
+                                # Also check for common hospital/area names that might indicate same doctor
+                                common_segments = [
+                                    "hospital", "medical", "clinic", "centre", "center", 
+                                    "institute", "aiims", "apollo", "fortis", "max", "medanta"
+                                ]
+                                
+                                has_common_segment = False
+                                for segment in common_segments:
+                                    if segment in curr_loc_lower and segment in exist_loc_lower:
+                                        has_common_segment = True
+                                        break
+                                
+                                if loc_similarity >= 70 or has_common_segment:
+                                    merge_compatible = True
                                     break
-                            if location_compatible:
+                            if merge_compatible:
                                 break
-                    
-                    if location_compatible:
-                        # Found a duplicate with compatible locations, merge data
-                        result[idx].merge_with(current)
-                        is_duplicate = True
-                        break
+                        
+                        # If no location match but high name similarity and same specialization/city,
+                        # likely the same doctor with different practice locations
+                        if not merge_compatible and best_match_score >= 95:
+                            merge_compatible = True
+                
+                # If compatible, merge the doctors
+                if merge_compatible:
+                    result[best_match_idx].merge_with(current)
+                    is_duplicate = True
             
+            # If not a duplicate or not compatible for merging, add to results
             if not is_duplicate:
-                # Not a duplicate, add to results
                 result.append(current)
         
         return result
@@ -638,7 +821,20 @@ class DoctorSearchApp:
         """
         Search all sources for doctors based on location and specialization
         """
-        sources = ["practo", "justdial", "general", "hospital", "social"]
+        # Define base sources
+        base_sources = ["practo", "justdial", "general", "hospital", "social"]
+        
+        # Add secondary sources with location variations to increase results
+        # This helps find doctors in nearby areas or with different spellings
+        location_variants = self._get_location_variants(location)
+        secondary_sources = []
+        
+        # Only add secondary sources for major cities with known variants
+        if location_variants:
+            for variant in location_variants:
+                if variant != location:  # Skip the base location
+                    secondary_sources.append(("general", variant, specialization))
+        
         all_doctors = []
         
         # Create progress context
@@ -650,36 +846,80 @@ class DoctorSearchApp:
             console=console
         ) as progress:
             # Search each source concurrently
-            async def search_with_progress(source: str) -> List[Doctor]:
-                task = progress.add_task(f"Searching {source}...", total=1)
+            async def search_with_progress(source: str, loc: str = None, spec: str = None) -> List[Doctor]:
+                search_loc = loc or location
+                search_spec = spec or specialization
+                task = progress.add_task(f"Searching {source} ({search_loc})...", total=1)
                 
                 try:
-                    doctors = await self.search_source(source, location, specialization)
-                    progress.update(task, completed=1, description=f"[green]Found {len(doctors)} doctors from {source}")
+                    doctors = await self.search_source(source, search_loc, search_spec)
+                    progress.update(task, completed=1, description=f"[green]Found {len(doctors)} doctors from {source} ({search_loc})")
                     return doctors
                 except Exception as e:
-                    logger.error(f"Error searching {source}: {str(e)}")
-                    progress.update(task, completed=1, description=f"[red]Error searching {source}")
+                    logger.error(f"Error searching {source} ({search_loc}): {str(e)}")
+                    progress.update(task, completed=1, description=f"[red]Error searching {source} ({search_loc})")
                     return []
             
-            # Execute all searches concurrently
-            tasks = [search_with_progress(source) for source in sources]
-            results = await asyncio.gather(*tasks)
+            # Execute primary searches concurrently
+            primary_tasks = [search_with_progress(source) for source in base_sources]
+            primary_results = await asyncio.gather(*primary_tasks)
             
-            # Combine all results
-            for doctors in results:
+            # Add all primary results
+            for doctors in primary_results:
                 all_doctors.extend(doctors)
+                
+            # If we found fewer than 10 doctors with primary sources, try secondary sources
+            if len(all_doctors) < 10 and secondary_sources:
+                console.print("[yellow]Found limited results. Searching additional locations...[/yellow]")
+                secondary_tasks = [search_with_progress(source, loc, spec) for source, loc, spec in secondary_sources]
+                secondary_results = await asyncio.gather(*secondary_tasks)
+                
+                # Add secondary results
+                for doctors in secondary_results:
+                    all_doctors.extend(doctors)
             
             # Deduplicate across all sources
             if all_doctors:
+                pre_dedup_count = len(all_doctors)
                 all_doctors = DataProcessor.deduplicate_doctors(all_doctors, self.config.FUZZY_MATCH_THRESHOLD)
+                post_dedup_count = len(all_doctors)
                 
                 # Save to database
                 self.db_manager.save_doctors(all_doctors)
-            
-            console.print(f"[bold green]Found {len(all_doctors)} unique doctors after deduplication[/bold green]")
+                
+                dedup_info = f"(removed {pre_dedup_count - post_dedup_count} duplicates)"
+                console.print(f"[bold green]Found {len(all_doctors)} unique doctors after deduplication {dedup_info}[/bold green]")
+            else:
+                console.print("[yellow]No doctors found matching your search criteria[/yellow]")
             
             return all_doctors
+            
+    def _get_location_variants(self, location: str) -> List[str]:
+        """Get variations of a location name to increase search coverage"""
+        location = location.lower().strip()
+        
+        # Define known variants for major cities
+        variants = {
+            "delhi": ["delhi", "new delhi", "delhi ncr"],
+            "mumbai": ["mumbai", "bombay"], 
+            "bangalore": ["bangalore", "bengaluru"],
+            "hyderabad": ["hyderabad", "secunderabad"],
+            "chennai": ["chennai", "madras"],
+            "kolkata": ["kolkata", "calcutta"],
+            "pune": ["pune", "pimpri-chinchwad"],
+            "jaipur": ["jaipur"],
+            "ahmedabad": ["ahmedabad"],
+            "surat": ["surat"],
+            "lucknow": ["lucknow"]
+        }
+        
+        # Return variants for the given location
+        for city, city_variants in variants.items():
+            if location in city_variants:
+                return city_variants
+                
+        # If not a major city, return just the original location
+        return [location]
 
     async def search_source(self, source: str, location: str, specialization: str) -> List[Doctor]:
         """
@@ -701,6 +941,13 @@ class DoctorSearchApp:
         else:
             logger.warning(f"Unknown source: {source}")
             return []
+        
+        # Limit the number of prompts to avoid excessive API calls
+        # but ensure we use enough for good coverage
+        max_prompts = 25  # Adjust this number based on desired coverage vs. API cost
+        if len(prompts) > max_prompts:
+            # Randomly sample to maintain diversity but reduce count
+            prompts = random.sample(prompts, max_prompts)
         
         logger.info(f"Generated {len(prompts)} prompts for {source}")
         
@@ -753,18 +1000,23 @@ class DoctorSearchApp:
         table.add_column("Reviews", justify="center")
         table.add_column("Primary Location")
         table.add_column("Secondary Location")
+        table.add_column("Sources", justify="center")
         
         # Add rows to the table
         for doctor in doctors:
             primary_location = doctor.locations[0] if doctor.locations else "N/A"
             secondary_location = doctor.locations[1] if len(doctor.locations) > 1 else "N/A"
             
+            # Format sources cleanly
+            sources = "; ".join(sorted(set(src.lower() for src in doctor.contributing_sources)))
+            
             table.add_row(
                 doctor.name,
                 f"{doctor.rating:.1f} ⭐",
                 str(doctor.reviews),
                 primary_location,
-                secondary_location
+                secondary_location,
+                sources
             )
         
         console.print(table)
