@@ -94,7 +94,13 @@ def apply_custom_css():
         padding: 1.5rem;
         border-radius: 10px;
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        margin-bottom: 1rem;
+        margin-bottom: 1.5rem;
+    }}
+    .doctor-name {{
+        color: {COLORS['navy_blue']};
+        font-weight: bold;
+        font-size: 1.5rem;
+        margin-bottom: 0.5rem;
     }}
     .metric-label {{
         color: {COLORS['navy_blue']};
@@ -105,39 +111,50 @@ def apply_custom_css():
         color: {COLORS['dark_gray']};
         font-size: 1.1rem;
     }}
-    .quality-score {{
-        font-size: 1.2rem;
-        font-weight: bold;
-        padding: 0.3rem 0.8rem;
-        border-radius: 15px;
-    }}
-    .quality-high {{
-        background-color: #d4edda;
-        color: #155724;
-    }}
-    .quality-medium {{
-        background-color: #fff3cd;
-        color: #856404;
-    }}
-    .quality-low {{
-        background-color: #f8d7da;
-        color: #721c24;
-    }}
-    .source-tag {{
-        background-color: {COLORS['light_gray']};
-        color: {COLORS['dark_gray']};
-        padding: 0.2rem 0.5rem;
-        border-radius: 12px;
-        font-size: 0.8rem;
+    .location-item {{
+        background-color: #f8f9fa;
+        padding: 0.3rem 0.6rem;
+        border-radius: 5px;
         margin-right: 0.5rem;
+        margin-bottom: 0.5rem;
+        display: inline-block;
+        font-size: 0.9rem;
     }}
-    .verified-badge {{
-        background-color: {COLORS['lime_green']};
-        color: white;
-        padding: 0.2rem 0.5rem;
-        border-radius: 12px;
-        font-size: 0.8rem;
-        margin-left: 0.5rem;
+    .phone-item {{
+        background-color: #e8f4fc;
+        padding: 0.3rem 0.6rem;
+        border-radius: 5px;
+        margin-right: 0.5rem;
+        margin-bottom: 0.5rem;
+        display: inline-block;
+        font-size: 0.9rem;
+    }}
+    .source-item {{
+        background-color: #e9f7ef;
+        padding: 0.3rem 0.6rem;
+        border-radius: 5px;
+        margin-right: 0.5rem;
+        margin-bottom: 0.5rem;
+        display: inline-block;
+        font-size: 0.9rem;
+    }}
+    .icon {{
+        margin-right: 0.3rem;
+    }}
+    .search-status {{
+        padding: 0.5rem;
+        border-radius: 5px;
+        text-align: center;
+        margin: 1rem 0;
+    }}
+    .results-count {{
+        font-size: 1.2rem;
+        color: {COLORS['navy_blue']};
+        margin: 1rem 0;
+        padding: 0.5rem;
+        background-color: {COLORS['light_gray']};
+        border-radius: 5px;
+        text-align: center;
     }}
     </style>
     """, unsafe_allow_html=True)
@@ -199,292 +216,183 @@ def run_async(coroutine):
     return asyncio.run(coroutine)
 
 def display_doctor_card(doctor: dict):
-    """Display a single doctor's information in a card format"""
+    """Display a single doctor's information focusing on the core fields"""
     with st.container():
         st.markdown('<div class="doctor-card">', unsafe_allow_html=True)
         
-        # Header row with name, rating, and verified badge
-        col1, col2, col3 = st.columns([3, 1, 1])
-        with col1:
-            header = f"### {doctor['name']}"
-            if doctor.get('verified', False):
-                header += ' <span class="verified-badge">✓ Verified</span>'
-            st.markdown(header, unsafe_allow_html=True)
+        # Doctor name
+        st.markdown(f'<div class="doctor-name">{doctor["name"]}</div>', unsafe_allow_html=True)
         
-        with col2:
-            st.metric("Rating", f"{doctor['rating']:.1f} ⭐")
-        
-        with col3:
-            st.metric("Reviews", f"{doctor['reviews']} 👥")
-        
-        # Data quality score
-        quality_score = doctor.get('data_quality_score', 0.0)
-        quality_class = (
-            'quality-high' if quality_score >= 0.7
-            else 'quality-medium' if quality_score >= 0.4
-            else 'quality-low'
-        )
-        st.markdown(
-            f'<div class="quality-score {quality_class}">Data Quality: {quality_score:.2f}</div>',
-            unsafe_allow_html=True
-        )
-        
-        # Main information columns
+        # Rating and reviews in columns
         col1, col2 = st.columns(2)
-        
         with col1:
-            if doctor.get('experience'):
-                st.markdown(f"**Experience:** {doctor['experience']}")
-            if doctor.get('fees'):
-                st.markdown(f"**Fees:** {doctor['fees']}")
-            if doctor.get('qualifications'):
-                st.markdown(f"**Qualifications:** {doctor['qualifications']}")
-            if doctor.get('registration'):
-                st.markdown(f"**Registration:** {doctor['registration']}")
-            if doctor.get('languages'):
-                st.markdown(f"**Languages:** {', '.join(doctor['languages'])}")
-        
+            stars = "⭐" * int(doctor['rating']) + ("⭐" if doctor['rating'] % 1 >= 0.5 else "")
+            st.markdown(f"**Rating:** {doctor['rating']:.1f} {stars}")
         with col2:
-            if doctor.get('timings'):
-                st.markdown(f"**Timings:** {doctor['timings']}")
-            if doctor.get('locations'):
-                st.markdown(f"**Locations:** {', '.join(doctor['locations'])}")
-            if doctor.get('hospitals'):
-                st.markdown(f"**Hospitals:** {', '.join(doctor['hospitals'])}")
-            if doctor.get('subspecialties'):
-                st.markdown(f"**Subspecialties:** {', '.join(doctor['subspecialties'])}")
+            st.markdown(f"**Reviews:** {doctor['reviews']} 👥")
         
-        # Expandable sections
-        if doctor.get('expertise') or doctor.get('services'):
-            with st.expander("Expertise & Services"):
-                if doctor.get('expertise'):
-                    st.markdown(f"**Areas of Expertise:** {doctor['expertise']}")
-                if doctor.get('services'):
-                    st.markdown("**Services Offered:**")
-                    for service in doctor['services']:
-                        st.markdown(f"- {service}")
+        # Location(s)
+        if doctor.get('locations'):
+            st.markdown("**📍 Locations:**")
+            locations_html = ""
+            for location in doctor['locations']:
+                locations_html += f'<span class="location-item">{location}</span>'
+            st.markdown(locations_html, unsafe_allow_html=True)
         
-        if doctor.get('education') or doctor.get('awards_and_recognitions'):
-            with st.expander("Education & Achievements"):
-                if doctor.get('education'):
-                    st.markdown("**Education:**")
-                    for edu in doctor['education']:
-                        st.markdown(f"- {edu}")
-                if doctor.get('awards_and_recognitions'):
-                    st.markdown("**Awards & Recognitions:**")
-                    for award in doctor['awards_and_recognitions']:
-                        st.markdown(f"- {award}")
+        # Phone Number(s)
+        if doctor.get('phone_numbers'):
+            st.markdown("**📞 Phone Numbers:**")
+            phones_html = ""
+            for phone in doctor['phone_numbers']:
+                phones_html += f'<span class="phone-item"><a href="tel:{phone}">{phone}</a></span>'
+            st.markdown(phones_html, unsafe_allow_html=True)
         
-        # Source information
-        st.markdown("**Data Sources:**")
-        sources_html = ' '.join([
-            f'<span class="source-tag">{source}</span>'
-            for source in doctor.get('contributing_sources', [doctor.get('source')])
-        ])
-        st.markdown(sources_html, unsafe_allow_html=True)
-        
-        # Last updated
-        if doctor.get('last_updated'):
-            st.markdown(
-                f"<small>Last updated: {doctor['last_updated']}</small>",
-                unsafe_allow_html=True
-            )
+        # Source URL(s)
+        if doctor.get('source_urls'):
+            st.markdown("**🔗 Source URLs:**")
+            sources_html = ""
+            for i, url in enumerate(doctor['source_urls']):
+                sources_html += f'<span class="source-item"><a href="{url}" target="_blank">Source {i+1}</a></span>'
+            st.markdown(sources_html, unsafe_allow_html=True)
         
         st.markdown('</div>', unsafe_allow_html=True)
 
 def display_search_results(results: dict):
-    """Display search results with enhanced visualization"""
-    doctors = results.get("data", [])
-    metadata = results.get("metadata", {})
+    """Display search results with a focus on core fields"""
+    if not results.get('success', False):
+        st.error(f"Search failed: {results.get('error', 'Unknown error')}")
+        return
     
-    # Display search summary
-    st.markdown("## Search Results")
+    data = results.get('data', [])
+    metadata = results.get('metadata', {})
     
-    # Create metrics row
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.metric("Total Doctors", metadata.get("total", 0))
-    with col2:
-        avg_quality = metadata.get("data_quality", {}).get("average_score", 0)
-        st.metric("Avg. Quality Score", f"{avg_quality:.2f}")
-    with col3:
-        verified = metadata.get("data_quality", {}).get("verified_profiles", 0)
-        st.metric("Verified Profiles", verified)
-    with col4:
-        duration = metadata.get("search_duration", 0)
-        st.metric("Search Time", f"{duration:.1f}s")
+    if not data:
+        st.warning("No doctors found matching your search criteria.")
+        return
     
-    # Display source information
-    sources = metadata.get("sources_used", [])
-    if sources:
-        st.markdown("### Data Sources")
-        source_cols = st.columns(len(sources))
-        for idx, source in enumerate(sources):
-            with source_cols[idx]:
-                st.markdown(f"<span class='source-tag'>{source}</span>", unsafe_allow_html=True)
+    # Display metadata and search stats
+    st.markdown(f"""
+    <div class="results-count">
+        Found {len(data)} doctors in {metadata.get('search_duration', 0):.2f} seconds
+    </div>
+    """, unsafe_allow_html=True)
     
     # Sorting options
-    sort_col1, sort_col2 = st.columns(2)
-    with sort_col1:
-        sort_by = st.selectbox(
-            "Sort by",
-            ["Rating", "Reviews", "Data Quality", "Experience"],
-            key="sort_by"
-        )
-    with sort_col2:
-        order = st.radio(
-            "Order",
-            ["Descending", "Ascending"],
-            horizontal=True,
-            key="sort_order"
-        )
+    sort_option = st.selectbox(
+        "Sort results by:",
+        options=["Rating (High to Low)", "Reviews (High to Low)"]
+    )
     
-    # Sort doctors
-    if doctors:
-        if sort_by == "Rating":
-            doctors.sort(key=lambda x: x["rating"], reverse=(order == "Descending"))
-        elif sort_by == "Reviews":
-            doctors.sort(key=lambda x: x["reviews"], reverse=(order == "Descending"))
-        elif sort_by == "Data Quality":
-            doctors.sort(key=lambda x: x.get("data_quality_score", 0), reverse=(order == "Descending"))
-        elif sort_by == "Experience":
-            # Extract years from experience string for sorting
-            def extract_years(exp):
-                if not exp:
-                    return 0
-                try:
-                    return int(''.join(filter(str.isdigit, exp.split()[0])))
-                except:
-                    return 0
-            doctors.sort(key=lambda x: extract_years(x.get("experience")), reverse=(order == "Descending"))
+    # Sort data based on selection
+    if sort_option == "Rating (High to Low)":
+        sorted_data = sorted(data, key=lambda x: (x.get('rating', 0), x.get('reviews', 0)), reverse=True)
+    else:  # Reviews (High to Low)
+        sorted_data = sorted(data, key=lambda x: (x.get('reviews', 0), x.get('rating', 0)), reverse=True)
     
-    # Display doctor cards
-    for doctor in doctors:
+    # Display all doctors
+    for doctor in sorted_data:
         display_doctor_card(doctor)
     
-    # Export options
-    if doctors:
-        st.markdown("### Export Data")
-        col1, col2 = st.columns(2)
+    # Create dataframe for download
+    df = pd.DataFrame([
+        {
+            'Name': d.get('name', ''),
+            'Rating': d.get('rating', 0),
+            'Reviews': d.get('reviews', 0),
+            'Locations': '; '.join(d.get('locations', [])),
+            'Phone Numbers': '; '.join(d.get('phone_numbers', [])),
+            'Source URLs': '; '.join(d.get('source_urls', [])),
+            'Specialization': d.get('specialization', ''),
+            'City': d.get('city', '')
+        } for d in sorted_data
+    ])
+    
+    # Provide download options
+    col1, col2 = st.columns(2)
+    with col1:
+        csv = df.to_csv(index=False)
+        st.download_button(
+            label="Download as CSV",
+            data=csv,
+            file_name=f"doctors_{metadata.get('query', {}).get('city', 'city')}_{metadata.get('query', {}).get('specialization', 'specialty')}.csv",
+            mime="text/csv"
+        )
+    
+    with col2:
+        json_data = json.dumps([{
+            'name': d.get('name', ''),
+            'rating': d.get('rating', 0),
+            'reviews': d.get('reviews', 0),
+            'locations': d.get('locations', []),
+            'phone_numbers': d.get('phone_numbers', []),
+            'source_urls': d.get('source_urls', []),
+            'specialization': d.get('specialization', ''),
+            'city': d.get('city', '')
+        } for d in sorted_data], indent=2)
         
-        with col1:
-            # Prepare CSV
-            df = pd.DataFrame(doctors)
-            csv = df.to_csv(index=False).encode('utf-8')
-            st.download_button(
-                label="Download as CSV",
-                data=csv,
-                file_name=f"doctor_search_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-                mime="text/csv"
-            )
-        
-        with col2:
-            # Prepare JSON
-            json_str = json.dumps(doctors, indent=2, default=str)
-            st.download_button(
-                label="Download as JSON",
-                data=json_str,
-                file_name=f"doctor_search_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
-                mime="application/json"
-            )
+        st.download_button(
+            label="Download as JSON",
+            data=json_data,
+            file_name=f"doctors_{metadata.get('query', {}).get('city', 'city')}_{metadata.get('query', {}).get('specialization', 'specialty')}.json",
+            mime="application/json"
+        )
 
 def main():
     # Set page config
     st.set_page_config(
         page_title="Doctor Search | Supervity",
-        page_icon="assets/Supervity_Icon.png",
-        layout="wide",
-        initial_sidebar_state="expanded"
+        page_icon="🩺",
+        layout="wide"
     )
     
     # Apply custom CSS
     apply_custom_css()
     
-    # Initialize session state
-    if 'search_results' not in st.session_state:
-        st.session_state.search_results = None
-    if 'search_error' not in st.session_state:
-        st.session_state.search_error = None
-    if 'is_searching' not in st.session_state:
-        st.session_state.is_searching = False
+    # Title and description
+    st.markdown('<div class="title">Doctor Search</div>', unsafe_allow_html=True)
+    st.markdown('<div class="subtitle">Find doctors by specialization and location</div>', unsafe_allow_html=True)
     
-    # Sidebar for filters and settings
-    with st.sidebar:
-        st.image("assets/Supervity_Black_Without_Background.png", width=200)
-        st.markdown("### Search Filters")
-        
-        # Additional filters (to be implemented in backend)
-        min_rating = st.slider("Minimum Rating", 0.0, 5.0, 0.0, 0.5)
-        min_reviews = st.number_input("Minimum Reviews", 0, 1000, 0)
-        verified_only = st.checkbox("Verified Doctors Only")
-        
-        st.markdown("### Data Sources")
-        sources = {
-            "practo": st.checkbox("Practo", value=True),
-            "justdial": st.checkbox("JustDial", value=True),
-            "hospitals": st.checkbox("Hospital Websites", value=True),
-            "councils": st.checkbox("Medical Councils", value=True)
-        }
+    # Search form in columns
+    col1, col2, col3 = st.columns([2, 2, 1])
     
-    # Main content
-    st.markdown("<h1 class='title'>Doctor Search</h1>", unsafe_allow_html=True)
-    st.markdown(
-        "<p class='subtitle'>Find verified healthcare providers with comprehensive information</p>",
-        unsafe_allow_html=True
-    )
+    with col1:
+        city = st.text_input("City", placeholder="Enter city name")
     
-    # Search form
-    with st.form(key="search_form"):
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            city = st.text_input("City", placeholder="Enter city name", key="city")
-        
-        with col2:
-            specialization_key = st.selectbox(
-                "Specialization",
-                options=list(specializations.keys()),
-                format_func=lambda key: specializations[key],
-                key="specialization"
-            )
-        
-        # Search button
-        submitted = st.form_submit_button("Search Doctors", type="primary")
+    with col2:
+        specialization = st.selectbox(
+            "Specialization",
+            options=list(specializations.values())
+        )
     
-    # Process form submission
-    if submitted:
-        if not city.strip():
-            st.error("Please enter a city name")
-        else:
-            st.session_state.is_searching = True
-            st.session_state.search_results = None
-            st.session_state.search_error = None
+    with col3:
+        st.markdown("<br>", unsafe_allow_html=True)  # Add some spacing
+        search_button = st.button("Search", use_container_width=True)
+    
+    # Handle search
+    if search_button and city and specialization:
+        with st.spinner("Searching for doctors, please wait..."):
+            st.markdown(f"""
+            <div class="search-status" style="background-color: #e8f4fd;">
+                Searching for {specialization} doctors in {city}...
+            </div>
+            """, unsafe_allow_html=True)
             
-            with st.spinner("🔍 Searching for doctors across multiple sources..."):
-                response = run_async(search_doctors(city, specialization_key))
-                
-                if response["success"]:
-                    st.session_state.search_results = response
-                else:
-                    st.session_state.search_error = response["error"]
-                
-            st.session_state.is_searching = False
+            # Call backend API
+            results = run_async(search_doctors(city, specialization))
+            
+            # Display results
+            display_search_results(results)
     
-    # Display results or error
-    if st.session_state.search_results:
-        display_search_results(st.session_state.search_results)
-    
-    if st.session_state.search_error:
-        st.error(f"Error: {st.session_state.search_error}")
-    
-    # Footer
-    st.markdown("---")
-    st.markdown(
-        "<div style='text-align: center'>"
-        "<small>Powered by Supervity | Data aggregated from multiple verified sources</small>"
-        "</div>",
-        unsafe_allow_html=True
-    )
+    # Show instructions if no search has been performed
+    if 'results' not in locals():
+        st.info("""
+        ### How to use:
+        1. Enter a city name
+        2. Select a medical specialization
+        3. Click the Search button
+        
+        You'll get a list of doctors with their ratings, reviews, locations, phone numbers, and source links.
+        """)
 
 if __name__ == "__main__":
     main() 

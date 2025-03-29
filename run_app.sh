@@ -25,6 +25,10 @@ fi
 BACKEND_URL=${1:-http://localhost:8000}
 echo "Using backend URL: $BACKEND_URL"
 
+# Install dependencies
+echo "Installing dependencies..."
+pip install -r requirements.txt
+
 # Start the backend server
 echo "Starting FastAPI backend..."
 python server.py &

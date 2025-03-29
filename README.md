@@ -1,6 +1,6 @@
 # Doctor Search Application
 
-A modern web application for searching and finding doctors across multiple sources, built with FastAPI, Streamlit, and the Gemini API.
+A streamlined web application for finding doctors with core information (name, rating, reviews, locations, phone numbers, and source URLs) across multiple sources, built with FastAPI, Streamlit, and the Gemini API.
 
 ## Project Structure
 
@@ -8,27 +8,23 @@ A modern web application for searching and finding doctors across multiple sourc
 doctor-data-scraping/
 ├── streamlit-frontend/         # Frontend Streamlit application
 │   ├── app_streamlit.py        # Main Streamlit application
-│   ├── requirements.txt        # Frontend dependencies
-│   ├── .env                    # Environment variables
-│   └── assets/                 # Image assets
-│       ├── Supervity_Black_Without_Background.png
-│       └── Supervity_Icon.png
-├── logs/                      # Application logs directory
+│   └── .env                    # Frontend environment variables
+├── logs/                       # Application logs directory
 ├── doctor_search_enhanced.py   # Core search functionality
 ├── server.py                   # FastAPI backend server
-├── requirements.txt            # Backend Python dependencies
+├── requirements.txt            # Python dependencies (backend & frontend)
 ├── run_app.sh                  # Script to run both frontend and backend
-├── .env                       # Root environment variables
-└── GEMINI_API_KEY_GUIDE.md    # Guide for obtaining API key
+├── .env                        # Root environment variables
+└── GEMINI_API_KEY_GUIDE.md     # Guide for obtaining API key
 ```
 
 ## Features
 
 - 🔍 Search doctors by city and specialization
+- 📱 Access core information: name, rating, reviews, locations, phone numbers, source URLs
+- 🚀 High throughput data collection through optimized Gemini API usage
 - 📊 Clean and intuitive user interface
-- ⭐ Display results with ratings and reviews
-- 📥 Export results to CSV
-- 🎨 Modern UI with Supervity brand colors
+- 📥 Export results to CSV or JSON
 - 🔄 Asynchronous processing for better performance
 
 ## Technology Stack
@@ -42,7 +38,7 @@ doctor-data-scraping/
 ### Backend
 - FastAPI
 - Python 3.8+
-- Google Gemini API
+- Google Gemini API (Gemini-2.0-flash model)
 - SQLite Database
 
 ## Setup
@@ -64,46 +60,20 @@ BACKEND_API_URL=http://localhost:8000
 
 ⚠️ **Important**: You must replace `your_gemini_api_key_here` with your actual Gemini API key, or the application will not work.
 
-### Backend Setup
-1. Create and activate a virtual environment:
-```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-```
+### Installation and Running
+The application uses a single requirements file for both frontend and backend dependencies:
 
-2. Install Python dependencies:
+1. Install all dependencies:
 ```bash
 pip install -r requirements.txt
 ```
 
-3. Start the FastAPI server:
-```bash
-python server.py
-```
-The server will run on http://localhost:8000
-
-### Frontend Setup
-1. Navigate to the frontend directory:
-```bash
-cd streamlit-frontend
-```
-
-2. Install dependencies:
-```bash
-pip install -r requirements.txt
-```
-
-3. Start the Streamlit server:
-```bash
-streamlit run app_streamlit.py
-```
-The application will be available at http://localhost:8501
-
-### Running Both Services Together
-For convenience, you can use the provided shell script to run both the backend and frontend:
+2. Run both services with the provided script:
 ```bash
 ./run_app.sh
 ```
+
+The backend will run on http://localhost:8000 and the frontend will be available at http://localhost:8501
 
 ## API Endpoints
 
@@ -128,9 +98,12 @@ Response:
       "rating": number,
       "reviews": number,
       "locations": ["string"],
+      "phone_numbers": ["string"],
+      "source_urls": ["string"],
       "source": "string",
       "specialization": "string",
       "city": "string",
+      "contributing_sources": ["string"],
       "timestamp": "string"
     }
   ],
@@ -140,7 +113,9 @@ Response:
     "query": {
       "city": "string",
       "specialization": "string"
-    }
+    },
+    "sources_queried": ["string"],
+    "search_duration": number
   }
 }
 ```
@@ -161,15 +136,9 @@ Response:
 The application searches across multiple sources:
 - Practo
 - JustDial
-- Hospital Websites
-- General Medical Directories
-
-## Contributing
-1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
+- General web search
+- Hospital websites
+- Social proof & review sites
 
 ## License
 MIT License

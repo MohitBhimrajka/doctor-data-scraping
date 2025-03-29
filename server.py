@@ -37,7 +37,7 @@ FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allows all origins
+    allow_origins=[FRONTEND_URL],  # Restrict to frontend URL
     allow_credentials=True,
     allow_methods=["*"],  # Allows all methods
     allow_headers=["*"],  # Allows all headers
@@ -57,32 +57,16 @@ class SearchRequest(BaseModel):
 
 class DoctorResponse(BaseModel):
     name: str
-    reviews: int
     rating: float
+    reviews: int
     locations: List[str]
+    phone_numbers: List[str]
+    source_urls: List[str]
     source: str
     specialization: str
     city: str
-    experience: Optional[str]
-    fees: Optional[str]
-    hospitals: List[str]
-    qualifications: Optional[str]
-    registration: Optional[str]
-    timings: Optional[str]
-    expertise: Optional[str]
-    feedback: Optional[str]
-    contributing_sources: List[str] = Field(default_factory=list)
-    estimated_fields: List[str] = Field(default_factory=list)
-    last_updated: datetime
-    data_quality_score: float = Field(default=0.0, ge=0.0, le=1.0)
-    verified: bool = Field(default=False)
-    languages: List[str] = Field(default_factory=list)
-    subspecialties: List[str] = Field(default_factory=list)
-    awards_and_recognitions: List[str] = Field(default_factory=list)
-    education: List[str] = Field(default_factory=list)
-    services: List[str] = Field(default_factory=list)
-    insurance_accepted: List[str] = Field(default_factory=list)
-    timestamp: datetime
+    contributing_sources: List[str]
+    timestamp: str
 
 class SearchResponse(BaseModel):
     success: bool
@@ -95,13 +79,8 @@ class SearchResponse(BaseModel):
             "city": "",
             "specialization": ""
         },
-        "sources_used": List[str],  # Track all sources queried
-        "search_duration": float,    # Search duration in seconds
-        "data_quality": {
-            "average_score": float,
-            "complete_profiles": int,
-            "verified_profiles": int
-        }
+        "sources_queried": [],  # Track all sources queried
+        "search_duration": 0.0,  # Search duration in seconds
     }
 
 @app.get("/")
@@ -113,7 +92,7 @@ async def read_root():
         "timestamp": datetime.now().isoformat()
     }
 
-@app.post("/search")
+@app.post("/api/search")
 async def search_doctors(request: SearchRequest):
     try:
         logger.info(f"Searching for {request.specialization} in {request.city}")
@@ -125,17 +104,23 @@ async def search_doctors(request: SearchRequest):
                 detail="City and specialization cannot be empty"
             )
         
+        start_time = datetime.now()
+        
         # Execute search
         doctors = await doctor_app.search_all_sources(request.city, request.specialization)
+        
+        search_duration = (datetime.now() - start_time).total_seconds()
+        
+        # Get list of sources queried
+        sources_queried = ["practo", "justdial", "general", "hospital", "social"]
         
         # Convert to response format
         response_data = []
         for doc in doctors:
             try:
-                doc_dict = doc.model_dump()  # Use Pydantic's model_dump() method
-                # Convert datetime to string if present
-                if 'timestamp' in doc_dict:
-                    doc_dict['timestamp'] = doc_dict['timestamp'].isoformat()
+                # Convert doctor model to dict, ensuring datetime is string
+                doc_dict = doc.model_dump()
+                doc_dict['timestamp'] = doc_dict['timestamp'].isoformat()
                 response_data.append(DoctorResponse(**doc_dict))
             except Exception as e:
                 logger.error(f"Error converting doctor data: {str(e)}")
@@ -152,17 +137,12 @@ async def search_doctors(request: SearchRequest):
                     "city": request.city,
                     "specialization": request.specialization
                 },
-                "sources_used": [],
-                "search_duration": 0.0,
-                "data_quality": {
-                    "average_score": 0.0,
-                    "complete_profiles": 0,
-                    "verified_profiles": 0
-                }
+                "sources_queried": sources_queried,
+                "search_duration": search_duration,
             }
         )
         
-        logger.info(f"Search completed in {len(response_data)} doctors.")
+        logger.info(f"Search completed with {len(response_data)} doctors in {search_duration:.2f} seconds")
         return response
         
     except Exception as e:
