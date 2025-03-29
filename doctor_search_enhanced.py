@@ -24,6 +24,9 @@ import random
 from sqlalchemy import create_engine, Column, String, Float, Integer, DateTime
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
+import base64
+from google import genai
+from google.genai import types
 
 # Configure logging
 logging.basicConfig(
@@ -459,52 +462,42 @@ class DataProcessor:
 # --- API Client ---
 class GeminiClient:
     def __init__(self, api_key: str, model_name: str):
-        genai.configure(api_key=api_key)
-        self.model = genai.GenerativeModel(model_name)
-        self.semaphore = asyncio.Semaphore(200)  # Increased to 200 for higher parallelization
-        self.rate_limit = 2000
-        self.request_count = 0
-        self.last_reset = time.time()
-
-    async def _process_request(self, prompt: str) -> str:
-        async with self.semaphore:
-            try:
-                # Rate limiting
-                current_time = time.time()
-                if current_time - self.last_reset >= 60:
-                    self.request_count = 0
-                    self.last_reset = current_time
-                
-                if self.request_count >= self.rate_limit:
-                    await asyncio.sleep(1)
-                    self.request_count = 0
-                    self.last_reset = time.time()
-
-                self.request_count += 1
-                
-                # Generate content
-                response = await asyncio.to_thread(
-                    self.model.generate_content,
-                    prompt,
-                    generation_config={
-                        "temperature": 0.7,
-                        "top_p": 0.8,
-                        "top_k": 40
-                    }
-                )
-                
-                return response.text
-                
-            except Exception as e:
-                logger.error(f"Error in Gemini API call: {str(e)}")
-                return ""
+        self.client = genai.Client(api_key=api_key)
+        self.model_name = model_name
 
     async def generate_content(self, prompt: str) -> str:
-        return await self._process_request(prompt)
+        try:
+            contents = [
+                types.Content(
+                    role="user",
+                    parts=[
+                        types.Part.from_text(text=prompt),
+                    ],
+                ),
+            ]
+            
+            tools = [
+                types.Tool(google_search=types.GoogleSearch())
+            ]
+            
+            generate_content_config = types.GenerateContentConfig(
+                tools=tools,
+                response_mime_type="text/plain",
+            )
 
-    async def generate_content_batch(self, prompts: List[str]) -> List[str]:
-        tasks = [self.generate_content(prompt) for prompt in prompts]
-        return await asyncio.gather(*tasks)
+            response = []
+            async for chunk in self.client.models.generate_content_stream(
+                model=self.model_name,
+                contents=contents,
+                config=generate_content_config,
+            ):
+                if chunk.text:
+                    response.append(chunk.text)
+
+            return "".join(response)
+        except Exception as e:
+            logger.error(f"Error generating content with Gemini: {str(e)}")
+            raise
 
 # --- Main Application ---
 class DoctorSearchApp:
