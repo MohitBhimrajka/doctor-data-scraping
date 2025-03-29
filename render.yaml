@@ -13,5 +13,7 @@ services:
         value: http://localhost:8000
       - key: FRONTEND_URL
         value: http://localhost:8000
+      - key: PORT
+        value: 10000
     healthCheckPath: /health
     autoDeploy: true 

@@ -42,6 +42,9 @@ load_dotenv()
 
 # Set up the backend URL
 BACKEND_API_URL = os.getenv("BACKEND_API_URL", "http://localhost:8000")
+if os.getenv("RENDER"):
+    # If running on Render, use the internal URL
+    BACKEND_API_URL = "http://localhost:8000"
 logger.info(f"Using backend API URL: {BACKEND_API_URL}")
 
 # Define specializations dictionary
