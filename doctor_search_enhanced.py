@@ -64,8 +64,6 @@ class Doctor(BaseModel):
     rating: float = Field(default=0.0, ge=0.0, le=5.0)
     reviews: int = Field(default=0, ge=0)
     locations: List[str] = Field(default_factory=list)
-    phone_numbers: List[str] = Field(default_factory=list)
-    source_urls: List[str] = Field(default_factory=list)
     specialization: str
     city: str
     contributing_sources: List[str] = Field(default_factory=list)
@@ -86,12 +84,6 @@ class Doctor(BaseModel):
         
         # Merge locations
         self.locations.extend([loc for loc in other.locations if loc not in self.locations])
-        
-        # Merge phone numbers
-        self.phone_numbers.extend([phone for phone in other.phone_numbers if phone not in self.phone_numbers])
-        
-        # Merge source URLs
-        self.source_urls.extend([url for url in other.source_urls if url not in self.source_urls])
         
         # Update rating and reviews if the other record has more reviews
         if other.reviews > self.reviews:
@@ -119,8 +111,6 @@ class DatabaseManager:
                     rating REAL DEFAULT 0.0,
                     reviews INTEGER DEFAULT 0,
                     locations TEXT,
-                    phone_numbers TEXT,
-                    source_urls TEXT,
                     specialization TEXT,
                     city TEXT,
                     contributing_sources TEXT,
@@ -133,14 +123,13 @@ class DatabaseManager:
             for doctor in doctors:
                 conn.execute("""
                     INSERT INTO doctors (
-                        name, rating, reviews, locations, phone_numbers, source_urls,
+                        name, rating, reviews, locations,
                         specialization, city, contributing_sources, timestamp
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     doctor.name, doctor.rating, doctor.reviews,
-                    json.dumps(doctor.locations), json.dumps(doctor.phone_numbers),
-                    json.dumps(doctor.source_urls), doctor.specialization,
+                    json.dumps(doctor.locations), doctor.specialization,
                     doctor.city, json.dumps(doctor.contributing_sources),
                     doctor.timestamp.isoformat()
                 ))
@@ -157,8 +146,6 @@ class DatabaseManager:
             for row in rows:
                 data = dict(zip([col[0] for col in cursor.description], row))
                 data['locations'] = json.loads(data['locations'])
-                data['phone_numbers'] = json.loads(data['phone_numbers'])
-                data['source_urls'] = json.loads(data['source_urls'])
                 data['contributing_sources'] = json.loads(data['contributing_sources'])
                 data['timestamp'] = datetime.fromisoformat(data['timestamp'])
                 
@@ -178,10 +165,11 @@ class PromptManager:
         json_instruction = (
             "Provide results in the following JSON format only: "
             "[{\"name\": \"Doctor Name\", \"rating\": 4.5, \"reviews\": 120, "
-            "\"location\": [\"Address 1\", \"Address 2\"], "
-            "\"phone_number\": [\"+1234567890\"], "
-            "\"url\": [\"https://example.com/profile\"]}]. "
-            "Output only the JSON list with no explanatory text."
+            "\"location\": [\"Specific address in requested city\", \"Another address in requested city\"]}]. "
+            "Output only the JSON list with no explanatory text. "
+            "IMPORTANT: Only include doctors whose PRIMARY practice location is in the specified city. "
+            "Do NOT include doctors who primarily practice in other cities. "
+            "For each doctor, provide specific clinic/hospital addresses, not generic locations."
         )
         return f"{prompt}. {json_instruction}"
 
@@ -190,50 +178,25 @@ class PromptManager:
         """Generate prompts for Practo search"""
         prompts = []
         
-        # Core pattern variations
+        # Core pattern variations with explicit location focus
         base_patterns = [
-            f"site:practo.com {specialization} doctor in {location} rating reviews phone number address",
-            f"site:practo.com {specialization} clinic {location} contact number ratings address",
-            f"site:practo.com dr name {specialization} {location} profile link phone ratings reviews",
-            f"site:practo.com best {specialization} doctors {location} contact info ratings",
-            f"site:practo.com top rated {specialization} {location} phone number address reviews",
-            f"site:practo.com {specialization} specialist {location} profile URL rating",
-            f"site:practo.com experienced {specialization} {location} contact details rating",
-            f"site:practo.com {specialization} physician {location} phone ratings reviews profile",
-            f"site:practo.com {specialization} consultation {location} doctor contact rating",
-            f"site:practo.com {specialization} medical {location} doctor profile phone number",
+            f"site:practo.com {specialization} doctor primarily practicing in {location} clinic address rating reviews",
+            f"site:practo.com {specialization} doctor with main clinic in {location} address rating reviews", 
+            f"site:practo.com best {specialization} doctors based permanently in {location} rating reviews address",
+            f"site:practo.com {specialization} specialist with clinic established in {location} address ratings",
+            f"site:practo.com top rated {specialization} doctors only practicing in {location} address reviews"
         ]
         
-        # Generate more detailed queries
+        # Add negative constraints to exclude other cities
+        other_cities = ["Delhi", "Mumbai", "Bangalore", "Chennai", "Kolkata", "Hyderabad", "Pune"]
+        other_cities = [city for city in other_cities if city.lower() != location.lower()]
+        
         for pattern in base_patterns:
             prompts.append(PromptManager._add_json_instruction(pattern))
             
-            # Add variations with common doctor prefixes
-            for prefix in ["Dr.", "Doctor", "Prof. Dr.", "Dr", "MD"]:
-                prompts.append(PromptManager._add_json_instruction(f"{pattern} {prefix}"))
-            
-            # Add variations with specific location types
-            for loc_type in ["hospital", "clinic", "medical center", "healthcare", "practice"]:
-                prompts.append(PromptManager._add_json_instruction(f"{pattern} {loc_type}"))
-        
-        # Add specific rating-focused queries
-        rating_patterns = [
-            f"site:practo.com highly rated {specialization} doctor {location} contact",
-            f"site:practo.com 5 star {specialization} {location} doctor phone number",
-            f"site:practo.com best reviewed {specialization} doctor {location} contact information",
-            f"site:practo.com top {specialization} doctor {location} rating phone address"
-        ]
-        for pattern in rating_patterns:
-            prompts.append(PromptManager._add_json_instruction(pattern))
-        
-        # Add specific contact-focused queries
-        contact_patterns = [
-            f"site:practo.com {specialization} doctor {location} multiple locations contact numbers",
-            f"site:practo.com {specialization} {location} clinic address phone consultation",
-            f"site:practo.com {specialization} doctor {location} office phone numbers profile"
-        ]
-        for pattern in contact_patterns:
-            prompts.append(PromptManager._add_json_instruction(pattern))
+            # Add a negative constraint version
+            city_exclusion = " ".join([f"-{city}" for city in other_cities[:3]])
+            prompts.append(PromptManager._add_json_instruction(f"{pattern} {city_exclusion}"))
         
         return prompts
 
@@ -242,24 +205,24 @@ class PromptManager:
         """Generate prompts for JustDial search"""
         prompts = []
         
-        # Core pattern variations
+        # Core pattern variations with explicit location focus
         base_patterns = [
-            f"site:justdial.com {specialization} doctors in {location} rating reviews phone contact",
-            f"site:justdial.com best {specialization} clinics {location} contact details ratings",
-            f"site:justdial.com {specialization} specialist {location} phone number address ratings",
-            f"site:justdial.com top {specialization} doctors {location} rating reviews location",
-            f"site:justdial.com {specialization} physician {location} phone number office location",
-            f"site:justdial.com {specialization} doctor near {location} contact information ratings",
-            f"site:justdial.com {specialization} medical service {location} doctor profile phone",
-            f"site:justdial.com find {specialization} doctor {location} direct number reviews",
-            f"site:justdial.com {specialization} healthcare provider {location} rating contact",
-            f"site:justdial.com {specialization} clinic {location} doctor listing reviews phone"
+            f"site:justdial.com {specialization} doctors primarily based in {location} clinic address rating reviews",
+            f"site:justdial.com best {specialization} clinics established in {location} exact address ratings",
+            f"site:justdial.com {specialization} specialist with permanent clinic in {location} address ratings"
         ]
         
-        # Generate more detailed queries
+        # Add negative constraints to exclude other cities
+        other_cities = ["Delhi", "Mumbai", "Bangalore", "Chennai", "Kolkata", "Hyderabad", "Pune"]
+        other_cities = [city for city in other_cities if city.lower() != location.lower()]
+        
         for pattern in base_patterns:
             prompts.append(PromptManager._add_json_instruction(pattern))
             
+            # Add a negative constraint version
+            city_exclusion = " ".join([f"-{city}" for city in other_cities[:3]])
+            prompts.append(PromptManager._add_json_instruction(f"{pattern} {city_exclusion}"))
+        
         return prompts
 
     @staticmethod
@@ -267,56 +230,23 @@ class PromptManager:
         """Generate prompts for general search (Google, Bing, etc.)"""
         prompts = []
         
-        # Core queries for general search
+        # Core queries for general search with explicit location focus
         base_patterns = [
-            f"{specialization} doctor in {location} rating reviews phone address",
-            f"best {specialization} in {location} contact information ratings",
-            f"top rated {specialization} doctor {location} phone number reviews",
-            f"{specialization} specialist {location} contact details rating",
-            f"find {specialization} clinic {location} doctor phone ratings",
-            f"{specialization} medical center {location} doctor contact information",
-            f"recommended {specialization} doctor {location} phone address reviews",
-            f"experienced {specialization} in {location} contact rating",
-            f"{specialization} doctor near {location} phone ratings reviews",
-            f"{specialization} healthcare provider {location} contact details rating"
+            f"{specialization} doctor with permanent clinic in {location} exact street address rating reviews",
+            f"best {specialization} doctors primarily practicing in {location} clinic address ratings",
+            f"top rated {specialization} specialists based in {location} hospital/clinic address reviews"
         ]
         
-        # Generate more detailed queries
+        # Add negative constraints to exclude other cities
+        other_cities = ["Delhi", "Mumbai", "Bangalore", "Chennai", "Kolkata", "Hyderabad", "Pune"]
+        other_cities = [city for city in other_cities if city.lower() != location.lower()]
+        
         for pattern in base_patterns:
             prompts.append(PromptManager._add_json_instruction(pattern))
             
-            # Add variations with common doctor prefixes
-            for prefix in ["Dr.", "Doctor", "Prof. Dr.", "MD"]:
-                prompts.append(PromptManager._add_json_instruction(f"{prefix} {pattern}"))
-            
-            # Add variations with location and rating specifics
-            for loc_type in ["clinic", "hospital", "practice", "center", "chamber"]:
-                prompts.append(PromptManager._add_json_instruction(f"{pattern} {loc_type}"))
-        
-        # Add search engine variations
-        for site in ["", "site:healthgrades.com", "site:zocdoc.com", "site:google.com/maps"]:
-            for pattern in base_patterns[:3]:  # Use only the first few base patterns
-                if site:
-                    prompts.append(PromptManager._add_json_instruction(f"{site} {pattern}"))
-        
-        # Add specific rating-focused queries
-        rating_patterns = [
-            f"highest rated {specialization} in {location} contact information",
-            f"5 star {specialization} doctor {location} phone address",
-            f"best reviewed {specialization} clinic {location} contact",
-            f"{specialization} doctor with most reviews in {location} phone"
-        ]
-        for pattern in rating_patterns:
-            prompts.append(PromptManager._add_json_instruction(pattern))
-        
-        # Add specific contact-focused queries
-        contact_patterns = [
-            f"{specialization} doctor {location} multiple office locations phone",
-            f"{specialization} {location} clinic address contact numbers",
-            f"contact details for {specialization} doctors in {location} ratings"
-        ]
-        for pattern in contact_patterns:
-            prompts.append(PromptManager._add_json_instruction(pattern))
+            # Add a negative constraint version
+            city_exclusion = " ".join([f"-{city}" for city in other_cities[:3]])
+            prompts.append(PromptManager._add_json_instruction(f"{pattern} {city_exclusion}"))
         
         return prompts
 
@@ -328,33 +258,17 @@ class PromptManager:
         # List of major hospital chains
         hospitals = [
             "apollo", "fortis", "manipal", "max", "medanta", "aiims", 
-            "kokilaben", "narayana", "jaslok", "lilavati", "columbia asia",
-            "care", "bm birla", "sterling", "ruby hall", "hinduja", "artemis",
-            "kauvery", "cmc vellore", "wockhardt", "rainbow", "kims"
+            "kokilaben", "narayana", "jaslok", "lilavati"
         ]
         
-        # Generate hospital-specific queries
+        # Generate hospital-specific queries with location focus
         for hospital in hospitals:
             base_patterns = [
-                f"site:{hospital}hospitals.com {specialization} doctor {location} contact rating",
-                f"site:{hospital}.com {specialization} specialist {location} phone reviews",
-                f"site:{hospital}hospital.com {specialization} doctor profile {location} contact",
-                f"site:{hospital}health.com {specialization} physician {location} rating phone"
+                f"site:{hospital}hospitals.com {specialization} doctor at {hospital} {location} branch exact address rating",
+                f"site:{hospital}.com {specialization} specialist practicing at {hospital} {location} location address"
             ]
             for pattern in base_patterns:
                 prompts.append(PromptManager._add_json_instruction(pattern))
-        
-        # Generate general hospital-related queries
-        general_patterns = [
-            f"site:hospitals.com {specialization} doctor {location} contact information ratings",
-            f"hospital {specialization} department {location} doctor contact ratings",
-            f"medical center {specialization} doctor {location} phone directory ratings",
-            f"healthcare facility {specialization} expert {location} contact details",
-            f"multispecialty hospital {specialization} {location} doctor phone address",
-            f"hospital directory {specialization} doctors {location} contact ratings"
-        ]
-        for pattern in general_patterns:
-            prompts.append(PromptManager._add_json_instruction(pattern))
         
         return prompts
 
@@ -363,38 +277,23 @@ class PromptManager:
         """Generate prompts for social proof and review sites"""
         prompts = []
         
-        # Core pattern variations for social proof
+        # Core pattern variations for social proof with location focus
         base_patterns = [
-            f"site:google.com/maps {specialization} doctor {location} reviews rating phone address",
-            f"site:yelp.com {specialization} doctor {location} review rating contact",
-            f"site:facebook.com {specialization} doctor {location} rating reviews contact",
-            f"site:quora.com recommended {specialization} in {location} contact rating",
-            f"site:reddit.com r/askdocs best {specialization} {location} contact reviews",
-            f"site:healthgrades.com {specialization} {location} phone rating reviews",
-            f"site:ratemds.com {specialization} doctor {location} phone contact ratings"
+            f"site:google.com/maps {specialization} doctor clinics in {location} exact address rating reviews",
+            f"site:yelp.com top {specialization} doctors permanently based in {location} clinic address ratings",
+            f"site:healthgrades.com {specialization} specialists with established practice in {location} address"
         ]
+        
+        # Add negative constraints to exclude other cities
+        other_cities = ["Delhi", "Mumbai", "Bangalore", "Chennai", "Kolkata", "Hyderabad", "Pune"]
+        other_cities = [city for city in other_cities if city.lower() != location.lower()]
         
         for pattern in base_patterns:
             prompts.append(PromptManager._add_json_instruction(pattern))
-        
-        # Additional socially-derived patterns
-        social_patterns = [
-            f"most reviewed {specialization} doctor {location} phone contact address",
-            f"patient recommended {specialization} doctor {location} contact rating",
-            f"trusted {specialization} doctor {location} ratings contact information",
-            f"well-rated {specialization} clinic {location} phone address reviews"
-        ]
-        for pattern in social_patterns:
-            prompts.append(PromptManager._add_json_instruction(pattern))
-        
-        # Add specific review-focused queries
-        review_patterns = [
-            f"site:google.com/maps {specialization} {location} 5 star doctor phone contact",
-            f"site:yelp.com highest rated {specialization} {location} contact information",
-            f"best reviewed {specialization} doctor {location} practice phone location"
-        ]
-        for pattern in review_patterns:
-            prompts.append(PromptManager._add_json_instruction(pattern))
+            
+            # Add a negative constraint version
+            city_exclusion = " ".join([f"-{city}" for city in other_cities[:3]])
+            prompts.append(PromptManager._add_json_instruction(f"{pattern} {city_exclusion}"))
         
         return prompts
 
@@ -423,10 +322,59 @@ class DataProcessor:
             return None
 
     @staticmethod
+    def is_location_in_city(location: str, city: str) -> bool:
+        """
+        Check if a location is likely in the specified city.
+        Returns True if the location appears to be in the city, False otherwise.
+        """
+        if not location or not city:
+            return False
+            
+        # Normalize strings for comparison
+        location_lower = location.lower()
+        city_lower = city.lower()
+        
+        # Check if city name is in the location
+        if city_lower in location_lower:
+            return True
+            
+        # List of major cities (case insensitive) to check against
+        major_cities = ["delhi", "mumbai", "bangalore", "bengaluru", "chennai", "kolkata", 
+                        "hyderabad", "pune", "ahmedabad", "jaipur", "lucknow", "kanpur", 
+                        "nagpur", "indore", "thane", "bhopal", "visakhapatnam", "patna"]
+        
+        # If another major city is mentioned (and it's not the requested city)
+        for other_city in major_cities:
+            if other_city != city_lower and other_city in location_lower:
+                # Check if it's mentioning travel/visit to other city
+                travel_indicators = ["visit", "travels to", "also available in", "consultation in"]
+                for indicator in travel_indicators:
+                    if indicator in location_lower:
+                        # This indicates the doctor might still be primarily in the requested city
+                        return True
+                # No travel indicators but another city mentioned
+                return False
+                
+        # Check for generic/non-specific location terms
+        generic_locations = [
+            "multiple locations", "available online", "teleconsultation", 
+            "consultation available", "multiple branches", "across india",
+            "pan india", "all over india", "all major cities"
+        ]
+        
+        for generic in generic_locations:
+            if generic in location_lower:
+                return False
+                
+        # If we've reached here and no other city is mentioned, assume it's in the requested city
+        return True
+
+    @staticmethod
     def standardize_doctor_data(data: List[Dict], source: str, specialization: str, city: str) -> List[Doctor]:
         """
         Standardize and clean doctor data from various sources
-        Focus only on core fields: name, rating, reviews, locations, phone_numbers, source_urls
+        Focus only on core fields: name, rating, reviews, locations
+        Apply strict location validation
         """
         standardized_doctors = []
         
@@ -470,83 +418,31 @@ class DataProcessor:
                     elif isinstance(item['location'], str):
                         locations.append(item['location'])
                 
-                # Clean locations more thoroughly
+                # Clean locations and validate they're in the specified city
                 cleaned_locations = []
-                generic_terms = ['near', 'opposite', 'behind', 'next to', 'in front of', 'across from', 'located at']
+                valid_location_found = False
+                
                 for loc in locations:
                     if loc and isinstance(loc, str):
                         # Remove very short locations and apply basic cleaning
                         loc = loc.strip()
+                        
                         # Remove generic location descriptors that don't add value
+                        generic_terms = ['near', 'opposite', 'behind', 'next to', 'in front of', 'across from', 'located at']
                         for term in generic_terms:
                             if loc.lower().startswith(term):
                                 loc = loc[len(term):].strip()
                         
                         # Keep only reasonable length locations (not too short, not too long)
                         if 3 < len(loc) < 150 and loc not in cleaned_locations:
-                            cleaned_locations.append(loc)
+                            # Check if this location is likely in the specified city
+                            if DataProcessor.is_location_in_city(loc, city):
+                                cleaned_locations.append(loc)
+                                valid_location_found = True
                 
-                # Process phone numbers - ensure it's a list
-                phone_numbers = []
-                for field in ['phone', 'phone_number', 'contact', 'mobile', 'telephone', 'phone_numbers']:
-                    if field in item and item[field]:
-                        if isinstance(item[field], list):
-                            phone_numbers.extend(item[field])
-                        elif isinstance(item[field], str):
-                            # Split by common separators
-                            for number in item[field].split(','):
-                                phone_numbers.append(number.strip())
-                
-                # Clean phone numbers more thoroughly
-                cleaned_phones = []
-                for phone in phone_numbers:
-                    if phone and isinstance(phone, str):
-                        # Normalize format - remove all non-digit characters except + for country code
-                        digits_only = ''.join(c for c in phone if c.isdigit() or c == '+')
-                        
-                        # Handle country codes - if no + prefix and length > 10, assume it needs one
-                        if not digits_only.startswith('+') and len(digits_only) > 10:
-                            # For Indian numbers (assume most common case)
-                            if digits_only.startswith('91') and len(digits_only) >= 12:
-                                digits_only = '+' + digits_only
-                            elif len(digits_only) == 10:  # Likely a local number without country code
-                                digits_only = '+91' + digits_only  # Add India country code by default
-                        
-                        # Filter invalid numbers (too short)
-                        if len(digits_only) >= 7 and digits_only not in cleaned_phones:
-                            cleaned_phones.append(digits_only)
-                
-                # Process source URLs - ensure it's a list
-                source_urls = []
-                for field in ['url', 'source_url', 'profile_url', 'link', 'website', 'source_urls']:
-                    if field in item and item[field]:
-                        if isinstance(item[field], list):
-                            source_urls.extend(item[field])
-                        elif isinstance(item[field], str):
-                            source_urls.append(item[field])
-                
-                # Clean source URLs with strict validation
-                cleaned_urls = []
-                url_prefixes = ['http://', 'https://']
-                for url in source_urls:
-                    if url and isinstance(url, str):
-                        url = url.strip()
-                        
-                        # Add proper prefix if missing
-                        has_valid_prefix = any(url.startswith(prefix) for prefix in url_prefixes)
-                        if not has_valid_prefix:
-                            if url.startswith('www.'):
-                                url = 'https://' + url
-                            else:
-                                url = 'https://' + url
-                        
-                        # Basic URL validation using string pattern checks
-                        has_domain = '.' in url.split('//')[-1]
-                        has_no_spaces = ' ' not in url
-                        reasonable_length = 10 <= len(url) <= 500
-                        
-                        if has_domain and has_no_spaces and reasonable_length and url not in cleaned_urls:
-                            cleaned_urls.append(url)
+                # Skip doctors with no valid locations in the specified city
+                if not valid_location_found:
+                    continue
                 
                 # Create doctor object with only the core fields
                 doctor = Doctor(
@@ -554,8 +450,6 @@ class DataProcessor:
                     rating=rating_value,
                     reviews=reviews_count,
                     locations=cleaned_locations,
-                    phone_numbers=cleaned_phones,
-                    source_urls=cleaned_urls,
                     specialization=specialization,
                     city=city,
                     contributing_sources=[source]
@@ -572,7 +466,8 @@ class DataProcessor:
     @staticmethod
     def deduplicate_doctors(doctors: List[Doctor], threshold: int) -> List[Doctor]:
         """
-        Deduplicate doctors based on name similarity and merge their data
+        Deduplicate doctors based on name similarity and location context
+        Only merge if they have similar locations
         """
         if not doctors:
             return []
@@ -592,10 +487,28 @@ class DataProcessor:
                 name_similarity = fuzz.ratio(current.name.lower(), existing.name.lower())
                 
                 if name_similarity >= threshold:
-                    # Found a duplicate, merge data
-                    result[idx].merge_with(current)
-                    is_duplicate = True
-                    break
+                    # Check if locations are compatible before merging
+                    location_compatible = False
+                    
+                    # If either has no locations, assume compatible
+                    if not current.locations or not existing.locations:
+                        location_compatible = True
+                    else:
+                        # Check if at least one location from each doctor seems similar
+                        for curr_loc in current.locations:
+                            for exist_loc in existing.locations:
+                                loc_similarity = fuzz.partial_ratio(curr_loc.lower(), exist_loc.lower())
+                                if loc_similarity >= 70:  # Threshold for location similarity
+                                    location_compatible = True
+                                    break
+                            if location_compatible:
+                                break
+                    
+                    if location_compatible:
+                        # Found a duplicate with compatible locations, merge data
+                        result[idx].merge_with(current)
+                        is_duplicate = True
+                        break
             
             if not is_duplicate:
                 # Not a duplicate, add to results

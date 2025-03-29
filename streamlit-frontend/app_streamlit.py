@@ -200,68 +200,42 @@ def run_async(coroutine):
     """Helper function to run async functions in Streamlit"""
     return asyncio.run(coroutine)
 
-def is_valid_url(url: str) -> bool:
-    """Check if a URL seems valid"""
-    if not isinstance(url, str):
+def is_valid_location(location: str, city: str) -> bool:
+    """Check if a location seems valid and is in the specified city"""
+    if not isinstance(location, str) or len(location) < 5:
         return False
     
-    # Basic URL validation
-    url_pattern = re.compile(
-        r'^(https?:\/\/)?(www\.)?'  # protocol and www
-        r'([a-zA-Z0-9-]+(\.[a-zA-Z0-9-]+)+)'  # domain
-        r'(\/[a-zA-Z0-9-._~:/?#[\]@!$&\'()*+,;=]*)?$'  # path
-    )
+    # Check if it contains the city name
+    city_lower = city.lower()
+    location_lower = location.lower()
     
-    if not url_pattern.match(url):
-        return False
+    # Exclude generic locations
+    generic_locations = [
+        "multiple locations", "available online", "teleconsultation", 
+        "consultation available", "multiple branches", "across india",
+        "pan india", "all over india", "all major cities"
+    ]
     
-    # Exclude fake/suspicious domains
-    suspicious_domains = ['example.com', 'test.com', 'cmcvellorehealth.com']
-    for domain in suspicious_domains:
-        if domain in url.lower():
+    for generic in generic_locations:
+        if generic in location_lower:
             return False
     
+    # Check if another major city is mentioned (and it's not the requested city)
+    other_cities = ["delhi", "mumbai", "bangalore", "bengaluru", "chennai", "kolkata", 
+                   "hyderabad", "pune", "ahmedabad", "jaipur", "lucknow"]
+    
+    for other_city in other_cities:
+        if other_city != city_lower and other_city in location_lower:
+            # Check if it's mentioning travel to the city
+            travel_indicators = ["visit", "travels to", "also available in", "consultation in"]
+            has_travel_indicator = any(indicator in location_lower for indicator in travel_indicators)
+            if not has_travel_indicator:
+                return False
+    
+    # If we reach here, the location is likely valid
     return True
 
-def is_valid_phone(phone: str) -> bool:
-    """Check if a phone number seems valid"""
-    if not isinstance(phone, str):
-        return False
-    
-    # Remove non-numeric characters
-    digits_only = re.sub(r'\D', '', phone)
-    
-    # Check if it has a reasonable length for a phone number
-    if len(digits_only) < 8 or len(digits_only) > 15:
-        return False
-    
-    # Exclude obviously fake numbers
-    fake_patterns = ['9876543210', '1234567890', '0000000000', '1111111111']
-    for pattern in fake_patterns:
-        if pattern in digits_only:
-            return False
-    
-    return True
-
-def clean_location(location: str) -> str:
-    """Clean up location text to remove unlikely locations or clarify city"""
-    if not isinstance(location, str):
-        return ""
-    
-    # Remove locations that are clearly not in the requested city
-    non_mumbai_locations = ['delhi', 'new delhi', 'gurgaon', 'gurugram', 'bangalore', 
-                           'hyderabad', 'chennai', 'kolkata', 'pune', 'ahmedabad']
-    
-    # If location explicitly mentions it's not in Mumbai, mark it
-    for loc in non_mumbai_locations:
-        if loc.lower() in location.lower() and 'mumbai' not in location.lower():
-            if 'visit' in location.lower() or 'consult' in location.lower():
-                return location  # Keep it if it mentions visiting Mumbai
-            return ""
-    
-    return location
-
-def filter_doctor_data(doctors_data: List[Dict]) -> List[Dict]:
+def filter_doctor_data(doctors_data: List[Dict], city: str) -> List[Dict]:
     """Filter and clean doctor data to remove suspicious entries"""
     filtered_data = []
     
@@ -288,33 +262,13 @@ def filter_doctor_data(doctors_data: List[Dict]) -> List[Dict]:
         if isinstance(locations, list):
             clean_doctor['locations'] = [
                 loc for loc in locations 
-                if isinstance(loc, str) and clean_location(loc)
+                if isinstance(loc, str) and is_valid_location(loc, city)
             ]
         else:
             clean_doctor['locations'] = []
             
-        # Filter phone numbers
-        phone_numbers = doctor.get('phone_numbers', [])
-        if isinstance(phone_numbers, list):
-            clean_doctor['phone_numbers'] = [
-                phone for phone in phone_numbers 
-                if isinstance(phone, str) and is_valid_phone(phone)
-            ]
-        else:
-            clean_doctor['phone_numbers'] = []
-            
-        # Filter source URLs
-        source_urls = doctor.get('source_urls', [])
-        if isinstance(source_urls, list):
-            clean_doctor['source_urls'] = [
-                url for url in source_urls 
-                if isinstance(url, str) and is_valid_url(url)
-            ]
-        else:
-            clean_doctor['source_urls'] = []
-            
-        # Only include doctors with at least one valid source URL
-        if clean_doctor['source_urls']:
+        # Only include doctors with at least one valid location
+        if clean_doctor['locations']:
             clean_doctor['contributing_sources'] = doctor.get('contributing_sources', [])
             filtered_data.append(clean_doctor)
     
@@ -336,8 +290,11 @@ def display_search_results(results: dict):
             st.error(f"Search failed: {error}")
             return
         
+        # Get city for location validation
+        city = metadata.get('query', {}).get('city', '')
+        
         # Clean and filter the data
-        filtered_data = filter_doctor_data(data)
+        filtered_data = filter_doctor_data(data, city)
         
         # Log data for debugging
         logger.info(f"Displaying search results: original_count={len(data)}, filtered_count={len(filtered_data)}")
@@ -383,33 +340,16 @@ def display_search_results(results: dict):
         summary_data = []
         for doc in sorted_data:
             # Create a simplified summary for each doctor
-            main_location = doc.get('locations', ['Not Available'])[0] if doc.get('locations') else 'Not Available'
-            main_phone = doc.get('phone_numbers', ['Not Available'])[0] if doc.get('phone_numbers') else 'Not Available'
-            main_source = doc.get('source_urls', ['Not Available'])[0] if doc.get('source_urls') else 'Not Available'
-            
-            # Extract domain from URL
-            source_domain = 'N/A'
-            if main_source != 'Not Available':
-                try:
-                    if '//' in main_source:
-                        source_domain = main_source.split('//')[1].split('/')[0]
-                    else:
-                        source_domain = main_source.split('/')[0]
-                    if source_domain.startswith('www.'):
-                        source_domain = source_domain[4:]
-                except:
-                    source_domain = main_source
+            primary_location = doc.get('locations', ['Not Available'])[0] if doc.get('locations') else 'Not Available'
+            secondary_location = doc.get('locations', ['', 'Not Available'])[1] if len(doc.get('locations', [])) > 1 else 'N/A'
             
             summary_data.append({
                 'Name': doc.get('name', ''),
                 'Rating': f"{float(doc.get('rating', 0)):.1f}" if isinstance(doc.get('rating'), (int, float, str)) else 'N/A',
                 'Reviews': doc.get('reviews', 0),
-                'Primary Location': main_location,
-                'Primary Contact': main_phone,
-                'Primary Source': source_domain,
-                'Total Locations': len(doc.get('locations', [])),
-                'Total Contacts': len(doc.get('phone_numbers', [])),
-                'Total Sources': len(doc.get('source_urls', []))
+                'Primary Location': primary_location,
+                'Secondary Location': secondary_location,
+                'Total Locations': len(doc.get('locations', []))
             })
         
         # Create DataFrame and display as table
@@ -425,8 +365,6 @@ def display_search_results(results: dict):
                     'Rating': d.get('rating', 0),
                     'Reviews': d.get('reviews', 0),
                     'Locations': '; '.join(d.get('locations', [])) if isinstance(d.get('locations'), list) else '',
-                    'Phone Numbers': '; '.join(d.get('phone_numbers', [])) if isinstance(d.get('phone_numbers'), list) else '',
-                    'Source URLs': '; '.join(d.get('source_urls', [])) if isinstance(d.get('source_urls'), list) else '',
                     'Specialization': d.get('specialization', ''),
                     'City': d.get('city', ''),
                     'Contributing Sources': '; '.join(d.get('contributing_sources', [])) if isinstance(d.get('contributing_sources'), list) else ''
@@ -454,8 +392,6 @@ def display_search_results(results: dict):
                     'rating': d.get('rating', 0),
                     'reviews': d.get('reviews', 0),
                     'locations': d.get('locations', []) if isinstance(d.get('locations'), list) else [],
-                    'phone_numbers': d.get('phone_numbers', []) if isinstance(d.get('phone_numbers'), list) else [],
-                    'source_urls': d.get('source_urls', []) if isinstance(d.get('source_urls'), list) else [],
                     'specialization': d.get('specialization', ''),
                     'city': d.get('city', ''),
                     'contributing_sources': d.get('contributing_sources', []) if isinstance(d.get('contributing_sources'), list) else []
