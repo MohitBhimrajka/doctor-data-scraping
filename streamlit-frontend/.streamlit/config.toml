@@ -1,0 +1,15 @@
+[theme]
+base="light"
+primaryColor="#000b37"
+secondaryBackgroundColor="#f0f0f0"
+textColor="#333333"
+
+[browser]
+gatherUsageStats = false
+
+[server]
+enableXsrfProtection = true
+enableCORS = true
+
+[ui]
+hideSidebarNav = true 
