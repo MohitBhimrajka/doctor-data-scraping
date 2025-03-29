@@ -618,23 +618,28 @@ class GeminiClient:
     )
     async def generate_content(self, prompt: str) -> str:
         """
-        Generate content using Google's Gemini API (Corrected with native async)
+        Generate content using Google's Gemini API
         """
         logger.debug(f"Generating content with prompt: {prompt[:100]}...")
         try:
             async with self.semaphore:
-                # Get the model instance
-                model = genai.GenerativeModel(model_name=self.model_name)
+                # Format the content using the proper types
+                contents = [
+                    types.Content(
+                        role="user",
+                        parts=[
+                            types.Part.from_text(text=prompt),
+                        ],
+                    )
+                ]
                 
-                # Call the native async method ON THE MODEL
-                response = await model.generate_content_async(
-                    contents=prompt,
-                    generation_config=types.GenerationConfig(
-                        temperature=0.2,
-                        top_p=0.95,
-                        top_k=64,
-                        max_output_tokens=8192,
-                    ),
+                # Create generation config
+                generation_config = types.GenerateContentConfig(
+                    temperature=0.2,
+                    top_p=0.95,
+                    top_k=64,
+                    max_output_tokens=8192,
+                    response_mime_type="text/plain",
                     safety_settings=[
                         {
                             "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
@@ -655,11 +660,19 @@ class GeminiClient:
                     ]
                 )
                 
+                # Use asyncio.to_thread to call the synchronous method in a separate thread
+                response = await asyncio.to_thread(
+                    self.client.models.generate_content,
+                    model=self.model_name,
+                    contents=contents,
+                    config=generation_config,
+                )
+                
                 # Check if the response has content
                 if response and hasattr(response, 'text'):
                     return response.text
-                elif response and hasattr(response, 'parts'):
-                    return "".join(part.text for part in response.parts)
+                elif response and hasattr(response, 'parts') and response.parts:
+                    return "".join(part.text for part in response.parts if hasattr(part, 'text'))
                 else:
                     logger.warning(f"Empty or unexpected response structure from Gemini API for prompt: {prompt[:50]}...")
                     return ""
