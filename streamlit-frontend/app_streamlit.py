@@ -9,9 +9,10 @@ import asyncio
 import logging
 from datetime import datetime
 import pathlib
+import re
 
 # Create logs directory if it doesn't exist
-log_dir = pathlib.Path(__file__).parent.parent / 'logs'
+log_dir = pathlib.Path(__file__).parent / 'logs'
 log_dir.mkdir(exist_ok=True)
 
 # Configure logging
@@ -30,6 +31,7 @@ load_dotenv()
 
 # Set up the backend URL
 BACKEND_API_URL = os.getenv("BACKEND_API_URL", "http://localhost:8000")
+logger.info(f"Using backend API URL: {BACKEND_API_URL}")
 
 # Define specializations dictionary
 specializations = {
@@ -89,64 +91,6 @@ def apply_custom_css():
         color: white;
         transform: translateY(-2px);
     }}
-    .doctor-card {{
-        background-color: white;
-        padding: 1.5rem;
-        border-radius: 10px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        margin-bottom: 1.5rem;
-    }}
-    .doctor-name {{
-        color: {COLORS['navy_blue']};
-        font-weight: bold;
-        font-size: 1.5rem;
-        margin-bottom: 0.5rem;
-    }}
-    .metric-label {{
-        color: {COLORS['navy_blue']};
-        font-weight: bold;
-        font-size: 0.9rem;
-    }}
-    .metric-value {{
-        color: {COLORS['dark_gray']};
-        font-size: 1.1rem;
-    }}
-    .location-item {{
-        background-color: #f8f9fa;
-        padding: 0.3rem 0.6rem;
-        border-radius: 5px;
-        margin-right: 0.5rem;
-        margin-bottom: 0.5rem;
-        display: inline-block;
-        font-size: 0.9rem;
-    }}
-    .phone-item {{
-        background-color: #e8f4fc;
-        padding: 0.3rem 0.6rem;
-        border-radius: 5px;
-        margin-right: 0.5rem;
-        margin-bottom: 0.5rem;
-        display: inline-block;
-        font-size: 0.9rem;
-    }}
-    .source-item {{
-        background-color: #e9f7ef;
-        padding: 0.3rem 0.6rem;
-        border-radius: 5px;
-        margin-right: 0.5rem;
-        margin-bottom: 0.5rem;
-        display: inline-block;
-        font-size: 0.9rem;
-    }}
-    .icon {{
-        margin-right: 0.3rem;
-    }}
-    .search-status {{
-        padding: 0.5rem;
-        border-radius: 5px;
-        text-align: center;
-        margin: 1rem 0;
-    }}
     .results-count {{
         font-size: 1.2rem;
         color: {COLORS['navy_blue']};
@@ -155,6 +99,27 @@ def apply_custom_css():
         background-color: {COLORS['light_gray']};
         border-radius: 5px;
         text-align: center;
+    }}
+    .debug-info {{
+        background-color: #f8f9fa;
+        padding: 1rem;
+        border-radius: 5px;
+        margin-top: 2rem;
+        font-family: monospace;
+        font-size: 0.8rem;
+    }}
+    .download-section {{
+        background-color: #f8f9fa;
+        padding: 1.5rem;
+        border-radius: 5px;
+        margin-top: 1.5rem;
+        border: 1px solid #ddd;
+    }}
+    .download-title {{
+        font-weight: bold;
+        font-size: 1.1rem;
+        margin-bottom: 1rem;
+        color: {COLORS['navy_blue']};
     }}
     </style>
     """, unsafe_allow_html=True)
@@ -172,25 +137,45 @@ async def search_doctors(city: str, specialization: str) -> Dict[str, Any]:
             "specialization": specialization
         }
         
+        logger.info(f"Sending request to {BACKEND_API_URL}/api/search with payload: {payload}")
+        
         # Make the API call
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 f"{BACKEND_API_URL}/api/search",
                 json=payload,
-                timeout=60.0  # Longer timeout as search can take time
+                timeout=120.0  # Increased timeout as search can take time
             )
+            
+            # Log the raw response for debugging
+            logger.info(f"Got response with status code: {response.status_code}")
             
             # Check if the request was successful
             if response.status_code == 200:
-                result = response.json()
-                logger.info(f"Search successful. Found {result.get('metadata', {}).get('total', 0)} doctors")
-                return result
+                try:
+                    result = response.json()
+                    logger.info(f"Search successful. Found {result.get('metadata', {}).get('total', 0)} doctors")
+                    
+                    # Verify the structure of the response
+                    if 'data' not in result or result['data'] is None:
+                        logger.warning(f"API returned success but no data field or empty data: {result}")
+                        result['data'] = []
+                    
+                    return result
+                except json.JSONDecodeError:
+                    logger.error(f"Failed to parse JSON response: {response.text[:200]}")
+                    return {
+                        "success": False,
+                        "error": "Failed to parse JSON response from backend",
+                        "data": [],
+                        "metadata": {"total": 0}
+                    }
             else:
-                logger.error(f"API call failed with status code {response.status_code}: {response.text}")
+                logger.error(f"API call failed with status code {response.status_code}: {response.text[:200]}")
                 return {
                     "success": False,
                     "error": f"API call failed with status code {response.status_code}",
-                    "data": None,
+                    "data": [],
                     "metadata": {"total": 0}
                 }
                 
@@ -199,15 +184,15 @@ async def search_doctors(city: str, specialization: str) -> Dict[str, Any]:
         return {
             "success": False,
             "error": f"Failed to connect to the backend: {str(e)}",
-            "data": None,
+            "data": [],
             "metadata": {"total": 0}
         }
     except Exception as e:
-        logger.error(f"Unexpected error during API call: {str(e)}")
+        logger.error(f"Unexpected error during API call: {type(e).__name__} - {str(e)}")
         return {
             "success": False,
             "error": f"An unexpected error occurred: {str(e)}",
-            "data": None,
+            "data": [],
             "metadata": {"total": 0}
         }
 
@@ -215,157 +200,281 @@ def run_async(coroutine):
     """Helper function to run async functions in Streamlit"""
     return asyncio.run(coroutine)
 
-def display_doctor_card(doctor: dict):
-    """Display a single doctor's information focusing on the core fields"""
-    with st.container():
-        st.markdown('<div class="doctor-card">', unsafe_allow_html=True)
-        
-        # Doctor name
-        st.markdown(f'<div class="doctor-name">{doctor["name"]}</div>', unsafe_allow_html=True)
-        
-        # Rating and reviews in columns
-        col1, col2 = st.columns(2)
-        with col1:
-            stars = "⭐" * int(doctor['rating']) + ("⭐" if doctor['rating'] % 1 >= 0.5 else "")
-            st.markdown(f"**Rating:** {doctor['rating']:.1f} {stars}")
-        with col2:
-            st.markdown(f"**Reviews:** {doctor['reviews']} 👥")
-        
-        # Location(s)
-        if doctor.get('locations'):
-            st.markdown("**📍 Locations:**")
-            locations_html = ""
-            for location in doctor['locations']:
-                locations_html += f'<span class="location-item">{location}</span>'
-            st.markdown(locations_html, unsafe_allow_html=True)
-        else:
-            st.markdown("**📍 Locations:** <span style='color: #888;'>Not Available</span>", unsafe_allow_html=True)
-        
-        # Phone Number(s)
-        if doctor.get('phone_numbers'):
-            st.markdown("**📞 Phone Numbers:**")
-            phones_html = ""
-            for phone in doctor['phone_numbers']:
-                # Make phone numbers clickable with tel: links
-                phones_html += f'<span class="phone-item"><a href="tel:{phone}">{phone}</a></span>'
-            st.markdown(phones_html, unsafe_allow_html=True)
-        else:
-            st.markdown("**📞 Phone Numbers:** <span style='color: #888;'>Not Available</span>", unsafe_allow_html=True)
-        
-        # Source URL(s)
-        if doctor.get('source_urls'):
-            st.markdown("**🔗 Source URLs:**")
-            urls_html = ""
-            for i, url in enumerate(doctor['source_urls']):
-                try:
-                    # Attempt to extract domain
-                    if '//' in url:
-                        domain = url.split('//')[1].split('/')[0]
-                    else:
-                        domain = url.split('/')[0]
-                    if domain.startswith('www.'):
-                        domain = domain[4:]
-                    link_text = domain
-                except Exception:
-                    link_text = f"Source {i+1}"  # Fallback link text
-                urls_html += f'<span class="source-item"><a href="{url}" target="_blank">{link_text}</a></span>'
-            st.markdown(urls_html, unsafe_allow_html=True)
-        else:
-            st.markdown("**🔗 Source URLs:** <span style='color: #888;'>Not Available</span>", unsafe_allow_html=True)
-            
-        # Contributing Sources
-        if doctor.get('contributing_sources'):
-            st.markdown("**🔍 Data Sources:**")
-            sources_html = ""
-            for source in doctor['contributing_sources']:
-                sources_html += f'<span class="source-item">{source}</span>'
-            st.markdown(sources_html, unsafe_allow_html=True)
-        
-        st.markdown('</div>', unsafe_allow_html=True)
-
-def display_search_results(results: dict):
-    """Display search results with a focus on core fields"""
-    if not results.get('success', False):
-        error_message = results.get('error', 'Unknown error')
-        st.error(f"Search failed: {error_message}")
-        return
+def is_valid_url(url: str) -> bool:
+    """Check if a URL seems valid"""
+    if not isinstance(url, str):
+        return False
     
-    data = results.get('data', [])
-    metadata = results.get('metadata', {})
-    
-    if not data:
-        st.warning("No doctors found matching your search criteria.")
-        return
-    
-    # Display metadata and search stats
-    st.markdown(f"""
-    <div class="results-count">
-        Found {len(data)} doctors in {metadata.get('search_duration', 0):.2f} seconds
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Sorting options
-    sort_option = st.selectbox(
-        "Sort results by:",
-        options=["Rating (High to Low)", "Reviews (High to Low)"]
+    # Basic URL validation
+    url_pattern = re.compile(
+        r'^(https?:\/\/)?(www\.)?'  # protocol and www
+        r'([a-zA-Z0-9-]+(\.[a-zA-Z0-9-]+)+)'  # domain
+        r'(\/[a-zA-Z0-9-._~:/?#[\]@!$&\'()*+,;=]*)?$'  # path
     )
     
-    # Sort data based on selection
-    if sort_option == "Rating (High to Low)":
-        sorted_data = sorted(data, key=lambda x: (x.get('rating', 0), x.get('reviews', 0)), reverse=True)
-    else:  # Reviews (High to Low)
-        sorted_data = sorted(data, key=lambda x: (x.get('reviews', 0), x.get('rating', 0)), reverse=True)
+    if not url_pattern.match(url):
+        return False
     
-    # Display all doctors
-    for doctor in sorted_data:
-        display_doctor_card(doctor)
+    # Exclude fake/suspicious domains
+    suspicious_domains = ['example.com', 'test.com', 'cmcvellorehealth.com']
+    for domain in suspicious_domains:
+        if domain in url.lower():
+            return False
     
-    # Create dataframe for download - improved CSV formatting
-    df = pd.DataFrame([
-        {
-            'Name': d.get('name', ''),
-            'Rating': d.get('rating', 0),
-            'Reviews': d.get('reviews', 0),
-            'Locations': '; '.join(d.get('locations', [])),
-            'Phone Numbers': '; '.join(d.get('phone_numbers', [])),
-            'Source URLs': '; '.join(d.get('source_urls', [])),
-            'Specialization': d.get('specialization', ''),
-            'City': d.get('city', ''),
-            'Contributing Sources': '; '.join(d.get('contributing_sources', []))
-        } for d in sorted_data
-    ])
+    return True
+
+def is_valid_phone(phone: str) -> bool:
+    """Check if a phone number seems valid"""
+    if not isinstance(phone, str):
+        return False
     
-    # Provide download options
-    col1, col2 = st.columns(2)
-    with col1:
-        csv = df.to_csv(index=False)
-        st.download_button(
-            label="Download as CSV",
-            data=csv,
-            file_name=f"doctors_{metadata.get('query', {}).get('city', 'city')}_{metadata.get('query', {}).get('specialization', 'specialty')}.csv",
-            mime="text/csv"
-        )
+    # Remove non-numeric characters
+    digits_only = re.sub(r'\D', '', phone)
     
-    with col2:
-        # Preserve proper list structure in JSON
-        json_data = json.dumps([{
-            'name': d.get('name', ''),
-            'rating': d.get('rating', 0),
-            'reviews': d.get('reviews', 0),
-            'locations': d.get('locations', []),
-            'phone_numbers': d.get('phone_numbers', []),
-            'source_urls': d.get('source_urls', []),
-            'specialization': d.get('specialization', ''),
-            'city': d.get('city', ''),
-            'contributing_sources': d.get('contributing_sources', [])
-        } for d in sorted_data], indent=2)
+    # Check if it has a reasonable length for a phone number
+    if len(digits_only) < 8 or len(digits_only) > 15:
+        return False
+    
+    # Exclude obviously fake numbers
+    fake_patterns = ['9876543210', '1234567890', '0000000000', '1111111111']
+    for pattern in fake_patterns:
+        if pattern in digits_only:
+            return False
+    
+    return True
+
+def clean_location(location: str) -> str:
+    """Clean up location text to remove unlikely locations or clarify city"""
+    if not isinstance(location, str):
+        return ""
+    
+    # Remove locations that are clearly not in the requested city
+    non_mumbai_locations = ['delhi', 'new delhi', 'gurgaon', 'gurugram', 'bangalore', 
+                           'hyderabad', 'chennai', 'kolkata', 'pune', 'ahmedabad']
+    
+    # If location explicitly mentions it's not in Mumbai, mark it
+    for loc in non_mumbai_locations:
+        if loc.lower() in location.lower() and 'mumbai' not in location.lower():
+            if 'visit' in location.lower() or 'consult' in location.lower():
+                return location  # Keep it if it mentions visiting Mumbai
+            return ""
+    
+    return location
+
+def filter_doctor_data(doctors_data: List[Dict]) -> List[Dict]:
+    """Filter and clean doctor data to remove suspicious entries"""
+    filtered_data = []
+    
+    for doctor in doctors_data:
+        if not isinstance(doctor, dict):
+            continue
+            
+        # Skip doctors with suspicious names
+        name = doctor.get('name', '')
+        if not name or any(x in name for x in ['XYZ', 'ABC', 'PQR']):
+            continue
+            
+        # Clean up data fields
+        clean_doctor = {
+            'name': name,
+            'rating': doctor.get('rating', 0),
+            'reviews': doctor.get('reviews', 0),
+            'specialization': doctor.get('specialization', ''),
+            'city': doctor.get('city', '')
+        }
         
-        st.download_button(
-            label="Download as JSON",
-            data=json_data,
-            file_name=f"doctors_{metadata.get('query', {}).get('city', 'city')}_{metadata.get('query', {}).get('specialization', 'specialty')}.json",
-            mime="application/json"
+        # Filter locations
+        locations = doctor.get('locations', [])
+        if isinstance(locations, list):
+            clean_doctor['locations'] = [
+                loc for loc in locations 
+                if isinstance(loc, str) and clean_location(loc)
+            ]
+        else:
+            clean_doctor['locations'] = []
+            
+        # Filter phone numbers
+        phone_numbers = doctor.get('phone_numbers', [])
+        if isinstance(phone_numbers, list):
+            clean_doctor['phone_numbers'] = [
+                phone for phone in phone_numbers 
+                if isinstance(phone, str) and is_valid_phone(phone)
+            ]
+        else:
+            clean_doctor['phone_numbers'] = []
+            
+        # Filter source URLs
+        source_urls = doctor.get('source_urls', [])
+        if isinstance(source_urls, list):
+            clean_doctor['source_urls'] = [
+                url for url in source_urls 
+                if isinstance(url, str) and is_valid_url(url)
+            ]
+        else:
+            clean_doctor['source_urls'] = []
+            
+        # Only include doctors with at least one valid source URL
+        if clean_doctor['source_urls']:
+            clean_doctor['contributing_sources'] = doctor.get('contributing_sources', [])
+            filtered_data.append(clean_doctor)
+    
+    return filtered_data
+
+def display_search_results(results: dict):
+    """Display search results in a summary table format"""
+    try:
+        if not results:
+            st.warning("No search results available.")
+            return
+            
+        success = results.get('success', False)
+        error = results.get('error', None)
+        data = results.get('data', [])
+        metadata = results.get('metadata', {})
+        
+        if not success:
+            st.error(f"Search failed: {error}")
+            return
+        
+        # Clean and filter the data
+        filtered_data = filter_doctor_data(data)
+        
+        # Log data for debugging
+        logger.info(f"Displaying search results: original_count={len(data)}, filtered_count={len(filtered_data)}")
+        
+        if not filtered_data:
+            st.warning("No qualified doctors found matching your search criteria.")
+            return
+        
+        # Display metadata and search stats
+        st.markdown(f"""
+        <div class="results-count">
+            Found {len(filtered_data)} verified doctors in {metadata.get('search_duration', 0):.2f} seconds
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Sorting options
+        sort_option = st.selectbox(
+            "Sort results by:",
+            options=["Rating (High to Low)", "Reviews (High to Low)"]
         )
+        
+        # Sort data based on selection
+        try:
+            if sort_option == "Rating (High to Low)":
+                sorted_data = sorted(
+                    filtered_data, 
+                    key=lambda x: (float(x.get('rating', 0)) if isinstance(x.get('rating'), (int, float, str)) else 0, 
+                                   int(x.get('reviews', 0)) if isinstance(x.get('reviews'), (int, float, str)) else 0), 
+                    reverse=True
+                )
+            else:  # Reviews (High to Low)
+                sorted_data = sorted(
+                    filtered_data, 
+                    key=lambda x: (int(x.get('reviews', 0)) if isinstance(x.get('reviews'), (int, float, str)) else 0, 
+                                   float(x.get('rating', 0)) if isinstance(x.get('rating'), (int, float, str)) else 0), 
+                    reverse=True
+                )
+        except Exception as e:
+            logger.error(f"Error sorting data: {type(e).__name__} - {str(e)}")
+            sorted_data = filtered_data  # Use unsorted data if sorting fails
+        
+        # Create a summary DataFrame for display
+        summary_data = []
+        for doc in sorted_data:
+            # Create a simplified summary for each doctor
+            main_location = doc.get('locations', ['Not Available'])[0] if doc.get('locations') else 'Not Available'
+            main_phone = doc.get('phone_numbers', ['Not Available'])[0] if doc.get('phone_numbers') else 'Not Available'
+            main_source = doc.get('source_urls', ['Not Available'])[0] if doc.get('source_urls') else 'Not Available'
+            
+            # Extract domain from URL
+            source_domain = 'N/A'
+            if main_source != 'Not Available':
+                try:
+                    if '//' in main_source:
+                        source_domain = main_source.split('//')[1].split('/')[0]
+                    else:
+                        source_domain = main_source.split('/')[0]
+                    if source_domain.startswith('www.'):
+                        source_domain = source_domain[4:]
+                except:
+                    source_domain = main_source
+            
+            summary_data.append({
+                'Name': doc.get('name', ''),
+                'Rating': f"{float(doc.get('rating', 0)):.1f}" if isinstance(doc.get('rating'), (int, float, str)) else 'N/A',
+                'Reviews': doc.get('reviews', 0),
+                'Primary Location': main_location,
+                'Primary Contact': main_phone,
+                'Primary Source': source_domain,
+                'Total Locations': len(doc.get('locations', [])),
+                'Total Contacts': len(doc.get('phone_numbers', [])),
+                'Total Sources': len(doc.get('source_urls', []))
+            })
+        
+        # Create DataFrame and display as table
+        summary_df = pd.DataFrame(summary_data)
+        st.dataframe(summary_df, use_container_width=True)
+        
+        # Create detailed dataframe for download
+        try:
+            # Full data with all details
+            df = pd.DataFrame([
+                {
+                    'Name': d.get('name', ''),
+                    'Rating': d.get('rating', 0),
+                    'Reviews': d.get('reviews', 0),
+                    'Locations': '; '.join(d.get('locations', [])) if isinstance(d.get('locations'), list) else '',
+                    'Phone Numbers': '; '.join(d.get('phone_numbers', [])) if isinstance(d.get('phone_numbers'), list) else '',
+                    'Source URLs': '; '.join(d.get('source_urls', [])) if isinstance(d.get('source_urls'), list) else '',
+                    'Specialization': d.get('specialization', ''),
+                    'City': d.get('city', ''),
+                    'Contributing Sources': '; '.join(d.get('contributing_sources', [])) if isinstance(d.get('contributing_sources'), list) else ''
+                } for d in sorted_data
+            ])
+            
+            # Provide download options
+            st.markdown('<div class="download-section">', unsafe_allow_html=True)
+            st.markdown('<p class="download-title">Download Complete Results</p>', unsafe_allow_html=True)
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                csv = df.to_csv(index=False)
+                st.download_button(
+                    label="Download as CSV",
+                    data=csv,
+                    file_name=f"doctors_{metadata.get('query', {}).get('city', 'city')}_{metadata.get('query', {}).get('specialization', 'specialty')}.csv",
+                    mime="text/csv"
+                )
+            
+            with col2:
+                # Preserve proper list structure in JSON
+                json_data = json.dumps([{
+                    'name': d.get('name', ''),
+                    'rating': d.get('rating', 0),
+                    'reviews': d.get('reviews', 0),
+                    'locations': d.get('locations', []) if isinstance(d.get('locations'), list) else [],
+                    'phone_numbers': d.get('phone_numbers', []) if isinstance(d.get('phone_numbers'), list) else [],
+                    'source_urls': d.get('source_urls', []) if isinstance(d.get('source_urls'), list) else [],
+                    'specialization': d.get('specialization', ''),
+                    'city': d.get('city', ''),
+                    'contributing_sources': d.get('contributing_sources', []) if isinstance(d.get('contributing_sources'), list) else []
+                } for d in sorted_data], indent=2)
+                
+                st.download_button(
+                    label="Download as JSON",
+                    data=json_data,
+                    file_name=f"doctors_{metadata.get('query', {}).get('city', 'city')}_{metadata.get('query', {}).get('specialization', 'specialty')}.json",
+                    mime="application/json"
+                )
+            
+            st.markdown('</div>', unsafe_allow_html=True)
+        except Exception as e:
+            logger.error(f"Error creating download files: {type(e).__name__} - {str(e)}")
+            st.error("Error preparing download files.")
+    except Exception as e:
+        logger.error(f"Error displaying search results: {type(e).__name__} - {str(e)}")
+        st.error(f"Error displaying search results: {str(e)}")
 
 def main():
     # Set page config
@@ -405,6 +514,14 @@ def main():
         st.session_state.is_searching = False
     if 'error' not in st.session_state:
         st.session_state.error = None
+    if 'debug_mode' not in st.session_state:
+        st.session_state.debug_mode = False
+    
+    # Add a debug toggle in the sidebar
+    with st.sidebar:
+        if 'debug_mode' not in st.session_state:
+            st.session_state.debug_mode = False
+        st.session_state.debug_mode = st.checkbox("Debug Mode", value=st.session_state.debug_mode)
     
     # Handle search button click
     if search_button:
@@ -444,6 +561,18 @@ def main():
                 error_message = f"Error: {type(e).__name__} - {str(e)}"
                 st.session_state.error = error_message
                 st.error(error_message)
+                logger.error(f"Search error: {error_message}")
+    
+    # Display search results if available
+    if st.session_state.search_results:
+        display_search_results(st.session_state.search_results)
+        
+        # Display debug information if debug mode is enabled
+        if st.session_state.debug_mode:
+            st.markdown("### Debug Information")
+            st.markdown('<div class="debug-info">', unsafe_allow_html=True)
+            st.json(st.session_state.search_results)
+            st.markdown('</div>', unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main() 
