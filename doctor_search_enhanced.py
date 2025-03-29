@@ -10,7 +10,6 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 import google.generativeai as genai
-from google.generativeai import types
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field, validator
 from fuzzywuzzy import fuzz
@@ -18,10 +17,13 @@ import aiohttp
 from tenacity import retry, stop_after_attempt, wait_exponential
 import sqlite3
 from rich.console import Console
-from rich.progress import Progress, SpinnerColumn, TextColumn
+from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn
 from rich.table import Table
 from rich.panel import Panel
 import random
+from sqlalchemy import create_engine, Column, String, Float, Integer, DateTime
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
 
 # Configure logging
 logging.basicConfig(
@@ -457,58 +459,50 @@ class DataProcessor:
 # --- API Client ---
 class GeminiClient:
     def __init__(self, api_key: str, model_name: str):
-        self.client = genai.Client(api_key=api_key)
-        self.model_name = model_name
-        self.tools = [types.Tool(google_search=types.GoogleSearch())]
-        self.config = types.GenerateContentConfig(
-            tools=self.tools,
-            response_mime_type="text/plain"
-        )
+        genai.configure(api_key=api_key)
+        self.model = genai.GenerativeModel(model_name)
         self.semaphore = asyncio.Semaphore(200)  # Increased to 200 for higher parallelization
         self.rate_limit = 2000
         self.request_count = 0
         self.last_reset = time.time()
 
     async def _process_request(self, prompt: str) -> str:
-        """Process a single request with streaming"""
-        try:
-            # Simple rate limit check
-            current_time = time.time()
-            if current_time - self.last_reset >= 60:
-                self.request_count = 0
-                self.last_reset = current_time
+        async with self.semaphore:
+            try:
+                # Rate limiting
+                current_time = time.time()
+                if current_time - self.last_reset >= 60:
+                    self.request_count = 0
+                    self.last_reset = current_time
+                
+                if self.request_count >= self.rate_limit:
+                    await asyncio.sleep(1)
+                    self.request_count = 0
+                    self.last_reset = time.time()
 
-            if self.request_count >= self.rate_limit:
-                await asyncio.sleep(0.1)  # Short sleep instead of waiting full minute
-                self.request_count = 0
-                self.last_reset = time.time()
-
-            contents = [types.Content(role="user", parts=[types.Part.from_text(text=prompt)])]
-            full_response = ""
-            
-            response = self.client.models.generate_content_stream(
-                model=self.model_name,
-                contents=contents,
-                config=self.config
-            )
-            
-            for chunk in response:
-                if chunk.text:
-                    full_response += chunk.text
-            
-            self.request_count += 1
-            return full_response
-        except Exception as e:
-            logger.error(f"Error processing request: {e}")
-            raise
+                self.request_count += 1
+                
+                # Generate content
+                response = await asyncio.to_thread(
+                    self.model.generate_content,
+                    prompt,
+                    generation_config={
+                        "temperature": 0.7,
+                        "top_p": 0.8,
+                        "top_k": 40
+                    }
+                )
+                
+                return response.text
+                
+            except Exception as e:
+                logger.error(f"Error in Gemini API call: {str(e)}")
+                return ""
 
     async def generate_content(self, prompt: str) -> str:
-        """Generate content with rate limiting"""
-        async with self.semaphore:
-            return await self._process_request(prompt)
+        return await self._process_request(prompt)
 
     async def generate_content_batch(self, prompts: List[str]) -> List[str]:
-        """Generate content for multiple prompts in parallel"""
         tasks = [self.generate_content(prompt) for prompt in prompts]
         return await asyncio.gather(*tasks)
 
