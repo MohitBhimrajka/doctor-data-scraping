@@ -1,19 +1,30 @@
 services:
   - type: web
-    name: doctor-search-app
+    name: doctor-discovery-backend
     env: python
-    buildCommand: |
-      pip install -r requirements.txt
-      cd streamlit-frontend && pip install -r requirements.txt
-    startCommand: chmod +x run_render.sh && ./run_render.sh
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
     envVars:
-      - key: GEMINI_API_KEY
+      - key: PYTHON_VERSION
+        value: 3.8.0
+      - key: DATABASE_URL
+        fromDatabase:
+          name: doctor_db
+          property: connectionString
+      - key: API_KEY
         sync: false
-      - key: BACKEND_API_URL
-        value: http://localhost:8000
-      - key: FRONTEND_URL
-        value: http://localhost:8000
-      - key: PORT
-        value: 10000
-    healthCheckPath: /health
-    autoDeploy: true 
+      - key: DEBUG
+        value: false
+
+  - type: web
+    name: doctor-discovery-frontend
+    env: python
+    buildCommand: pip install -r frontend/app/requirements.txt
+    startCommand: streamlit run frontend/app/main.py --server.port $PORT --server.address 0.0.0.0
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.8.0
+      - key: API_BASE_URL
+        value: https://doctor-discovery-backend.onrender.com
+      - key: DEBUG
+        value: false 

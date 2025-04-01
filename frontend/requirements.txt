@@ -1,0 +1,8 @@
+streamlit==1.32.0
+httpx==0.26.0
+pandas==2.2.0
+openpyxl==3.1.2
+python-dotenv==1.0.1
+plotly==5.18.0  # For visualizations
+streamlit-option-menu==0.3.12  # For better UI components
+streamlit-extras==0.3.1  # For additional UI components 

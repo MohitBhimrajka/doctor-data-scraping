@@ -1,1 +1,1 @@
-web: python server.py 
+web: streamlit run frontend/app/main.py --server.port $PORT --server.address 0.0.0.0 
