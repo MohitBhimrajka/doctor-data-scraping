@@ -59,7 +59,7 @@ def validate_doctor_data(doctor: Dict) -> bool:
     """
     required_fields = [
         "name", "specialization", "city", "rating",
-        "reviews", "locations", "contributing_sources",
+        "total_reviews", "locations", "contributing_sources",
         "profile_urls", "confidence_score", "timestamp"
     ]
     
@@ -73,7 +73,7 @@ def validate_doctor_data(doctor: Dict) -> bool:
         assert isinstance(doctor["specialization"], str)
         assert isinstance(doctor["city"], str)
         assert isinstance(doctor["rating"], (int, float))
-        assert isinstance(doctor["reviews"], int)
+        assert isinstance(doctor["total_reviews"], int)
         assert isinstance(doctor["locations"], list)
         assert isinstance(doctor["contributing_sources"], list)
         assert isinstance(doctor["profile_urls"], dict)

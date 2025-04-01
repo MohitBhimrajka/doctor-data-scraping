@@ -113,7 +113,7 @@ class DatabaseService:
                 if min_rating and doctor.rating < min_rating:
                     continue
                     
-                if min_reviews and doctor.reviews < min_reviews:
+                if min_reviews and doctor.total_reviews < min_reviews:
                     continue
                     
                 results.append(doctor)
@@ -165,7 +165,7 @@ class DatabaseService:
                     
                 # Sum ratings and reviews
                 total_rating += doctor.rating
-                total_reviews += doctor.reviews
+                total_reviews += doctor.total_reviews
                 total_confidence += doctor.confidence_score
                 
             # Calculate averages

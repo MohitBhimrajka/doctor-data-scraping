@@ -199,6 +199,10 @@ class DoctorDiscoveryService:
         # Add standard prefix
         return f"Dr. {name}"
 
+    def _get_search_sources(self) -> List[str]:
+        """Get the list of sources to search for doctor information."""
+        return ["practo", "google", "justdial"]
+
     def _parse_rating(self, rating: Any) -> float:
         """Parse and validate rating."""
         try:

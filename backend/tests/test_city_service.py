@@ -71,7 +71,7 @@ def city_service():
 def test_get_city_info(city_service):
     """Test getting city information."""
     # Test existing city
-    city = city_service.get_city_info("Mumbai")
+    city = city_service.get_city_by_name("Mumbai")
     assert city is not None
     assert city.name == "Mumbai"
     assert city.tier == 1
@@ -81,7 +81,7 @@ def test_get_city_info(city_service):
     assert "Bombay" in city.aliases
     
     # Test non-existent city
-    city = city_service.get_city_info("NonExistentCity")
+    city = city_service.get_city_by_name("NonExistentCity")
     assert city is None
 
 def test_search_cities(city_service):
@@ -143,22 +143,22 @@ def test_get_cities_by_state(city_service):
 def test_city_aliases(city_service):
     """Test city alias functionality."""
     # Test getting city by alias
-    city = city_service.get_city_info("Bombay")
+    city = city_service.get_city_by_name("Bombay")
     assert city is not None
     assert city.name == "Mumbai"
     
     # Test getting city by another alias
-    city = city_service.get_city_info("Poona")
+    city = city_service.get_city_by_name("Poona")
     assert city is not None
     assert city.name == "Pune"
 
 def test_city_cache(city_service):
     """Test city cache functionality."""
     # First call should load from file
-    city1 = city_service.get_city_info("Mumbai")
+    city1 = city_service.get_city_by_name("Mumbai")
     
     # Second call should use cache
-    city2 = city_service.get_city_info("Mumbai")
+    city2 = city_service.get_city_by_name("Mumbai")
     
     # Both should be the same object (cached)
     assert city1 is city2

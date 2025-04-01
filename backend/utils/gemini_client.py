@@ -2,7 +2,7 @@ import json
 import logging
 from typing import Any, Dict, List, Optional, Union
 import google.generativeai as genai
-from ..config import GOOGLE_API_KEY
+from ..config import GEMINI_API_KEY
 
 logger = logging.getLogger(__name__)
 
@@ -11,7 +11,7 @@ class GeminiClient:
 
     def __init__(self, model_name: str):
         """Initialize the client."""
-        genai.configure(api_key=GOOGLE_API_KEY)
+        genai.configure(api_key=GEMINI_API_KEY)
         self.model = genai.GenerativeModel(model_name)
 
     async def generate(self, prompt: str, timeout: Optional[int] = None) -> str:

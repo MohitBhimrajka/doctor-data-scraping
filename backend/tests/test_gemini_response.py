@@ -10,7 +10,7 @@ import pytest
 project_root = Path(__file__).parent.parent.parent
 sys.path.append(str(project_root))
 
-from backend.utils.client import GeminiClient
+from backend.utils.gemini_client import GeminiClient
 from backend.config import GEMINI_API_KEY
 
 @pytest.mark.asyncio

@@ -5,7 +5,6 @@ from fastapi.exceptions import RequestValidationError
 import logging
 
 from .api.routes import router as doctor_router
-from .config import settings
 
 # Configure logging
 logging.basicConfig(

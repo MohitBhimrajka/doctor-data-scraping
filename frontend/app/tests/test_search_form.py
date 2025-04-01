@@ -23,7 +23,7 @@ def mock_streamlit():
 def test_render_search_form_single_city(mock_streamlit):
     """Test rendering search form in single city mode."""
     # Setup
-    mock_streamlit['radio'].return_value = "single_city"
+    mock_streamlit['radio'].return_value = "Single City"
     mock_streamlit['text_input'].side_effect = ["Cardiologist", "Mumbai"]
     mock_streamlit['button'].return_value = True
     
@@ -38,7 +38,7 @@ def test_render_search_form_single_city(mock_streamlit):
 def test_render_search_form_country_wide(mock_streamlit):
     """Test rendering search form in country-wide mode."""
     # Setup
-    mock_streamlit['radio'].return_value = "country_wide"
+    mock_streamlit['radio'].return_value = "Country-Wide"
     mock_streamlit['text_input'].return_value = "Cardiologist"
     mock_streamlit['checkbox'].side_effect = [True, True, True]
     mock_streamlit['button'].return_value = True
@@ -55,7 +55,7 @@ def test_render_search_form_country_wide(mock_streamlit):
 def test_render_search_form_validation_error(mock_streamlit):
     """Test search form validation error handling."""
     # Setup
-    mock_streamlit['radio'].return_value = "single_city"
+    mock_streamlit['radio'].return_value = "Single City"
     mock_streamlit['text_input'].side_effect = ["C", "M"]  # Invalid inputs
     mock_streamlit['button'].return_value = True
     
@@ -68,7 +68,7 @@ def test_render_search_form_validation_error(mock_streamlit):
 def test_render_search_form_button_disabled(mock_streamlit):
     """Test search button disabled state."""
     # Setup
-    mock_streamlit['radio'].return_value = "single_city"
+    mock_streamlit['radio'].return_value = "Single City"
     mock_streamlit['text_input'].side_effect = ["", ""]  # Empty inputs
     mock_streamlit['button'].return_value = False
     
