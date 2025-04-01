@@ -4,7 +4,7 @@ from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 import logging
 
-from .api.routes import router as doctor_router
+from api.routes import router as doctor_router
 
 # Configure logging
 logging.basicConfig(

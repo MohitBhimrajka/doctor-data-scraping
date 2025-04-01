@@ -1,14 +1,25 @@
 import logging
 from typing import List, Dict, Optional
 from datetime import datetime
-from ..models.doctor import Doctor
-from ..config import (
+
+from models.doctor import Doctor
+from utils.gemini_client import GeminiClient
+from config import (
     VERIFICATION_MODEL_NAME,
-    RATING_SOURCE_WEIGHTS,
+    GEMINI_MODEL_NAME,
+    MAX_CONCURRENT_REQUESTS,
+    REQUEST_TIMEOUT,
     MAX_RETRIES,
-    REQUEST_TIMEOUT
+    RATING_SOURCE_WEIGHTS,
+    VERIFICATION_PROMPT_TEMPLATE,
+    VERIFICATION_TEMPERATURE,
+    VERIFICATION_TOP_K,
+    VERIFICATION_TOP_P,
+    VERIFICATION_MAX_OUTPUT_TOKENS,
+    VERIFICATION_STOP_SEQUENCES,
+    VERIFICATION_SAFETY_SETTINGS,
+    PRIORITY_SOURCES
 )
-from ..utils.gemini_client import GeminiClient
 
 logger = logging.getLogger(__name__)
 
@@ -134,18 +145,18 @@ class DoctorVerificationService:
             # Review count weight (0.2)
             review_score = min(doctor.total_reviews / 1000, 1.0)
 
-            # Source diversity (0.2)
-            source_score = min(len(doctor.contributing_sources) / 3, 1.0)
+            # Priority sources (0.2)
+            source_score = self._check_priority_sources(doctor)
+
+            # Source diversity (0.15)
+            source_diversity_score = min(len(doctor.contributing_sources) / 3, 1.0)
 
             # Location completeness (0.15)
             location_score = min(len(doctor.locations) / 3, 1.0)
 
-            # Profile completeness (0.15)
-            profile_score = min(len(doctor.profile_urls) / 3, 1.0)
-
             # Calculate weighted average
             weights = [0.3, 0.2, 0.2, 0.15, 0.15]
-            scores = [rating_score, review_score, source_score, location_score, profile_score]
+            scores = [rating_score, review_score, source_score, source_diversity_score, location_score]
             return sum(w * s for w, s in zip(weights, scores))
 
         except Exception as e:
@@ -169,4 +180,37 @@ class DoctorVerificationService:
 
         except Exception as e:
             logger.error(f"Error calculating rating consistency: {str(e)}")
+            return 0.0
+
+    def _check_priority_sources(self, doctor: Doctor) -> float:
+        """
+        Check if doctor information comes from priority sources.
+        
+        Args:
+            doctor: The doctor to check
+            
+        Returns:
+            Score between 0.0 and 1.0 based on sources
+        """
+        try:
+            # Priority sources
+            priority_sources = ["practo", "google", "justdial"]
+            
+            # Check how many priority sources are in the doctor's sources
+            doctor_sources = [s.lower() for s in doctor.contributing_sources]
+            priority_count = sum(1 for s in priority_sources if s in doctor_sources)
+            
+            # Calculate score
+            if len(doctor_sources) == 0:
+                return 0.0
+                
+            # If all sources are priority sources
+            if priority_count == len(doctor_sources):
+                return 1.0
+                
+            # Partial score based on ratio of priority sources
+            return priority_count / len(doctor_sources)
+            
+        except Exception as e:
+            logger.error(f"Error checking priority sources: {str(e)}")
             return 0.0 

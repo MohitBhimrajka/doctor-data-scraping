@@ -2,7 +2,8 @@ import json
 import logging
 from typing import Any, Dict, List, Optional, Union
 import google.generativeai as genai
-from ..config import GEMINI_API_KEY
+from google.generativeai.types import HarmCategory, HarmBlockThreshold
+from config import GEMINI_API_KEY
 
 logger = logging.getLogger(__name__)
 

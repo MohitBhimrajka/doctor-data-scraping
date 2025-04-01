@@ -3,10 +3,10 @@ from typing import List, Optional
 from datetime import datetime
 import logging
 
-from ..models.doctor import Doctor
-from ..services.discovery import DoctorDiscoveryService
-from ..services.database import DatabaseService
-from ..services.verification import DoctorVerificationService
+from models.doctor import Doctor
+from services.discovery import DoctorDiscoveryService
+from services.database import DatabaseService
+from services.verification import DoctorVerificationService
 
 router = APIRouter(
     prefix="/api/v1",
@@ -29,7 +29,8 @@ async def search_doctors(
     country: Optional[str] = "India",
     tiers: Optional[List[int]] = Query(None),
     page: int = Query(1, ge=1),
-    page_size: int = Query(10, ge=1, le=100)
+    page_size: int = Query(10, ge=1, le=100),
+    test_mode: bool = False
 ):
     """
     Search for doctors based on specialization and location.
@@ -41,6 +42,7 @@ async def search_doctors(
         tiers: List of city tiers to search in (optional)
         page: Page number for pagination
         page_size: Number of results per page
+        test_mode: Flag to enable test mode behavior (defaults to False)
     
     Returns:
         List of doctors matching the criteria
@@ -51,7 +53,8 @@ async def search_doctors(
             specialization=specialization,
             city=city,
             country=country,
-            tiers=tiers
+            tiers=tiers,
+            test_mode=test_mode
         )
         
         # Verify doctors

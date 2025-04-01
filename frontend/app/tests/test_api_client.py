@@ -26,12 +26,13 @@ def sample_doctor():
         'specialization': 'Cardiologist',
         'city': 'Mumbai',
         'rating': 4.5,
-        'reviews': 100,
-        'confidence': 0.8,
+        'total_reviews': 100,
+        'confidence_score': 0.8,
         'city_tier': 1,
         'locations': ['Hospital A', 'Hospital B'],
-        'sources': ['Source 1', 'Source 2'],
-        'last_updated': '2024-01-01T00:00:00Z'
+        'contributing_sources': ['Source 1', 'Source 2'],
+        'profile_urls': {'Source 1': 'http://example.com/1', 'Source 2': 'http://example.com/2'},
+        'timestamp': '2024-01-01T00:00:00Z'
     }
 
 @pytest.fixture

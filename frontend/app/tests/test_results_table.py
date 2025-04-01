@@ -33,12 +33,13 @@ def sample_doctors():
             'specialization': 'Cardiologist',
             'city': 'Mumbai',
             'rating': 4.5,
-            'reviews': 100,
-            'confidence': 0.8,
+            'total_reviews': 100,
+            'confidence_score': 0.8,
             'city_tier': 1,
             'locations': ['Hospital A', 'Hospital B'],
-            'sources': ['Source 1', 'Source 2'],
-            'last_updated': '2024-01-01'
+            'contributing_sources': ['Source 1', 'Source 2'],
+            'profile_urls': {'Source 1': 'http://example.com/1', 'Source 2': 'http://example.com/2'},
+            'timestamp': '2024-01-01'
         },
         {
             'id': '2',
@@ -46,12 +47,13 @@ def sample_doctors():
             'specialization': 'Cardiologist',
             'city': 'Delhi',
             'rating': 3.8,
-            'reviews': 50,
-            'confidence': 0.6,
+            'total_reviews': 50,
+            'confidence_score': 0.6,
             'city_tier': 2,
             'locations': ['Hospital C'],
-            'sources': ['Source 3'],
-            'last_updated': '2024-01-02'
+            'contributing_sources': ['Source 3'],
+            'profile_urls': {'Source 3': 'http://example.com/3'},
+            'timestamp': '2024-01-02'
         }
     ]
 

@@ -61,7 +61,7 @@ def render_doctor_profile(doctor: Dict) -> None:
         st.markdown(f"""
         **Rating:** {doctor['rating']} ⭐
         
-        **Reviews:** {doctor['reviews']}
+        **Reviews:** {doctor['total_reviews']}
         """)
     
     with col3:

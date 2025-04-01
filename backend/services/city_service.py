@@ -1,8 +1,8 @@
 import json
 from typing import List, Optional, Dict
 from pathlib import Path
-from ..models.city import CityInfo
-from ..config import DATA_DIR
+from models.city import CityInfo
+from config import DATA_DIR
 
 class CityService:
     def __init__(self, data_file: str = None):
@@ -52,14 +52,43 @@ class CityService:
                 return info
         return None
         
-    def search_cities(self, query: str) -> List[CityInfo]:
-        """Search cities by name or alias (case-insensitive)."""
-        query = query.lower().strip()
-        results = []
-        for city in self.cities:
-            if (query in city.name.lower() or
-                any(query in alias.lower() for alias in city.aliases)):
-                results.append(city)
+    def search_cities(self, query: str = "", state: str = None, tier: int = None, is_capital: bool = None) -> List[CityInfo]:
+        """
+        Search cities by query, state, tier, or capital status.
+        
+        Args:
+            query: Text to search in name or alias (case-insensitive)
+            state: Filter by state name
+            tier: Filter by city tier
+            is_capital: Filter by capital status
+        
+        Returns:
+            List of matching cities
+        """
+        results = self.cities.copy()
+        
+        # Filter by query if provided
+        if query:
+            query = query.lower().strip()
+            results = [
+                city for city in results
+                if (query in city.name.lower() or
+                    any(query in alias.lower() for alias in city.aliases))
+            ]
+        
+        # Filter by state if provided
+        if state:
+            state = state.lower().strip()
+            results = [city for city in results if city.state.lower() == state]
+        
+        # Filter by tier if provided
+        if tier is not None:
+            results = [city for city in results if city.tier == tier]
+        
+        # Filter by capital status if provided
+        if is_capital is not None:
+            results = [city for city in results if city.is_capital == is_capital]
+        
         return results
         
     def get_cities_by_population_range(self, min_population: int, max_population: int) -> List[CityInfo]:

@@ -3,6 +3,7 @@ import json
 from typing import Dict, Any
 from dotenv import load_dotenv
 from pathlib import Path
+from google.generativeai.types import HarmCategory, HarmBlockThreshold
 
 # Load environment variables from .env file
 load_dotenv()
@@ -72,6 +73,62 @@ ALLOWED_ORIGINS = clean_env_value(os.getenv("ALLOWED_ORIGINS", "http://localhost
 GEMINI_MODEL_NAME = clean_env_value(os.getenv("GEMINI_MODEL_NAME", "gemini-1.5-pro"))
 DISCOVERY_MODEL_NAME = clean_env_value(os.getenv("DISCOVERY_MODEL_NAME", "gemini-1.0-pro"))
 VERIFICATION_MODEL_NAME = clean_env_value(os.getenv("VERIFICATION_MODEL_NAME", "gemini-1.0-pro"))
+
+# Discovery Configuration
+DISCOVERY_PROMPT_TEMPLATE = """
+Search for doctors with the following criteria:
+{search_criteria}
+
+Please provide:
+1. Doctor's name
+2. Specialization
+3. City and state
+4. Rating and total reviews
+5. Hospital/clinic locations
+6. Profile URLs
+"""
+
+DISCOVERY_TEMPERATURE = 0.2
+DISCOVERY_TOP_K = 1
+DISCOVERY_TOP_P = 0.8
+DISCOVERY_MAX_OUTPUT_TOKENS = 1024
+DISCOVERY_STOP_SEQUENCES = ["END"]
+DISCOVERY_SAFETY_SETTINGS = {
+    "HARM_CATEGORY_HARASSMENT": "BLOCK_MEDIUM",
+    "HARM_CATEGORY_HATE_SPEECH": "BLOCK_MEDIUM",
+    "HARM_CATEGORY_SEXUALLY_EXPLICIT": "BLOCK_MEDIUM",
+    "HARM_CATEGORY_DANGEROUS_CONTENT": "BLOCK_MEDIUM"
+}
+
+# Verification Configuration
+VERIFICATION_PROMPT_TEMPLATE = """
+Verify the following doctor information:
+{doctor_info}
+
+Sources:
+{source_info}
+
+Please analyze the information and provide:
+1. Verification status (VERIFIED/UNVERIFIED)
+2. Confidence score (0-1)
+3. Any discrepancies found
+4. Suggested corrections
+"""
+
+VERIFICATION_TEMPERATURE = 0.2
+VERIFICATION_TOP_K = 1
+VERIFICATION_TOP_P = 0.8
+VERIFICATION_MAX_OUTPUT_TOKENS = 1024
+VERIFICATION_STOP_SEQUENCES = ["END"]
+VERIFICATION_SAFETY_SETTINGS = {
+    "HARM_CATEGORY_HARASSMENT": "BLOCK_MEDIUM",
+    "HARM_CATEGORY_HATE_SPEECH": "BLOCK_MEDIUM",
+    "HARM_CATEGORY_SEXUALLY_EXPLICIT": "BLOCK_MEDIUM",
+    "HARM_CATEGORY_DANGEROUS_CONTENT": "BLOCK_MEDIUM"
+}
+
+# Priority Sources
+PRIORITY_SOURCES = ["practo", "google"]
 
 # Data Configuration
 DATA_DIR = clean_env_value(os.getenv("DATA_DIR", "data"))

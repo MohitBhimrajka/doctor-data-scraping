@@ -1,10 +1,11 @@
 import logging
-from typing import List, Optional, Dict
-from datetime import datetime
 import json
+import sqlite3
+from datetime import datetime, timedelta
+from typing import List, Dict, Optional, Tuple, Any
 import os
 from pathlib import Path
-from ..models.doctor import Doctor
+from models.doctor import Doctor
 
 logger = logging.getLogger(__name__)
 
@@ -100,31 +101,69 @@ class DatabaseService:
             List of matching Doctor objects
         """
         try:
-            results = []
+            # Start with all doctors
+            all_doctors = list(self.doctors.values())
             
-            for doctor in self.doctors.values():
-                # Apply filters
-                if specialization and doctor.specialization.lower() != specialization.lower():
-                    continue
-                    
-                if city and doctor.city.lower() != city.lower():
-                    continue
-                    
-                if min_rating and doctor.rating < min_rating:
-                    continue
-                    
-                if min_reviews and doctor.total_reviews < min_reviews:
-                    continue
-                    
-                results.append(doctor)
+            # For debugging
+            initial_count = len(all_doctors)
+            logger.debug(f"Initial doctor count: {initial_count}")
+            if specialization:
+                logger.debug(f"Filtering by specialization: {specialization}")
+            if city:
+                logger.debug(f"Filtering by city: {city}")
+            if min_rating is not None:
+                logger.debug(f"Filtering by min_rating: {min_rating}")
+            if min_reviews is not None:
+                logger.debug(f"Filtering by min_reviews: {min_reviews}")
+            
+            # Filter the doctors
+            filtered_doctors = all_doctors
+            
+            if specialization:
+                filtered_doctors = [
+                    d for d in filtered_doctors 
+                    if d.specialization.lower() == specialization.lower()
+                ]
+                logger.debug(f"After specialization filter: {len(filtered_doctors)}")
                 
-            # Sort by confidence score and rating
-            results.sort(
-                key=lambda x: (x.confidence_score, x.rating),
+            if city:
+                filtered_doctors = [
+                    d for d in filtered_doctors 
+                    if d.city.lower() == city.lower()
+                ]
+                logger.debug(f"After city filter: {len(filtered_doctors)}")
+                
+            if min_rating is not None:
+                filtered_doctors = [
+                    d for d in filtered_doctors 
+                    if d.rating >= min_rating
+                ]
+                logger.debug(f"After rating filter: {len(filtered_doctors)}")
+                
+            if min_reviews is not None:
+                filtered_doctors = [
+                    d for d in filtered_doctors 
+                    if d.total_reviews >= min_reviews
+                ]
+                logger.debug(f"After reviews filter: {len(filtered_doctors)}")
+            
+            # Sort by confidence score, then rating, then review count
+            filtered_doctors.sort(
+                key=lambda x: (x.confidence_score, x.rating, x.total_reviews),
                 reverse=True
             )
             
-            return results[:limit]
+            # Apply limit
+            results = filtered_doctors[:limit]
+            logger.debug(f"Final result count: {len(results)}")
+            
+            # Log returned doctors for test debugging
+            if specialization and city and min_rating is not None and min_reviews is not None:
+                for idx, doctor in enumerate(results):
+                    logger.debug(f"Result {idx}: id={doctor.id}, name={doctor.name}, spec={doctor.specialization}, " +
+                                f"city={doctor.city}, rating={doctor.rating}, reviews={doctor.total_reviews}")
+            
+            return results
             
         except Exception as e:
             logger.error(f"Error searching doctors: {str(e)}")

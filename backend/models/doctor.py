@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import List, Dict, Optional
 from pydantic import BaseModel, Field, field_validator
 from fuzzywuzzy import fuzz
-from ..config import FUZZY_MATCH_THRESHOLD
+from config import FUZZY_MATCH_THRESHOLD
 
 class Doctor(BaseModel):
     """Doctor information model."""
@@ -18,6 +18,51 @@ class Doctor(BaseModel):
     profile_urls: Dict[str, str] = Field(default_factory=dict, description="URLs to doctor profiles on different platforms")
     confidence_score: float = Field(default=0.0, description="Confidence score for the data")
     timestamp: datetime = Field(default_factory=datetime.now, description="Timestamp of when the data was collected")
+
+    def __init__(self, **data):
+        super().__init__(**data)
+        # Calculate initial confidence score if none was provided
+        if self.confidence_score == 0.0 and 'confidence_score' not in data:
+            self.confidence_score = self._calculate_initial_confidence()
+
+    def _calculate_initial_confidence(self) -> float:
+        """Calculate an initial confidence score based on available data."""
+        try:
+            # Rating factor (0.3)
+            rating_score = 0.0
+            if self.rating >= 4.5:
+                rating_score = 1.0
+            elif self.rating >= 4.0:
+                rating_score = 0.8
+            elif self.rating >= 3.5:
+                rating_score = 0.6
+            elif self.rating >= 3.0:
+                rating_score = 0.4
+            else:
+                rating_score = 0.2
+
+            # Review count factor (0.2)
+            review_score = min(self.total_reviews / 1000, 1.0)
+
+            # Source quality factor (0.2)
+            priority_sources = ["practo", "google", "justdial"]
+            doctor_sources = [s.lower() for s in self.contributing_sources]
+            priority_count = sum(1 for s in priority_sources if s in doctor_sources)
+            source_score = priority_count / len(self.contributing_sources) if self.contributing_sources else 0.0
+
+            # Source diversity factor (0.15)
+            source_diversity_score = min(len(self.contributing_sources) / 3, 1.0)
+
+            # Location completeness factor (0.15)
+            location_score = min(len(self.locations) / 3, 1.0)
+
+            # Calculate weighted score
+            weights = [0.3, 0.2, 0.2, 0.15, 0.15]
+            scores = [rating_score, review_score, source_score, source_diversity_score, location_score]
+            return sum(w * s for w, s in zip(weights, scores))
+
+        except Exception:
+            return 0.1  # Fallback to a minimal score
 
     @field_validator("rating")
     def validate_rating(cls, v: float) -> float:
@@ -113,7 +158,7 @@ class Doctor(BaseModel):
                 "name": "Dr. John Doe",
                 "specialization": "Cardiologist",
                 "city": "Mumbai",
-                "city_tier": "Tier 1",
+                "city_tier": 1,
                 "rating": 4.5,
                 "total_reviews": 100,
                 "locations": ["Hospital A", "Clinic B"],

@@ -20,10 +20,12 @@ def sample_doctor():
         name="Dr. John Doe",
         specialization="Cardiologist",
         city="Mumbai",
+        city_tier=1,
         rating=4.5,
         total_reviews=100,
         locations=["Hospital A", "Clinic B"],
-        contributing_sources=["practo", "google"]
+        contributing_sources=["practo", "google"],
+        profile_urls={"practo": "https://practo.com/doctor123", "google": "https://g.page/doctor123"}
     )
 
 def test_save_and_get_doctor(database_service, sample_doctor):
@@ -59,10 +61,12 @@ def test_search_doctors(database_service):
             name=f"Dr. Doctor {i}",
             specialization="Cardiologist",
             city="Mumbai",
+            city_tier=1,
             rating=4.5,
             total_reviews=100,
             locations=[f"Hospital {i}"],
-            contributing_sources=["practo"]
+            contributing_sources=["practo"],
+            profile_urls={"practo": f"https://practo.com/doctor{i}"}
         )
         for i in range(5)
     ]
@@ -72,6 +76,19 @@ def test_search_doctors(database_service):
     doctors[2].city = "Delhi"
     doctors[3].rating = 3.5
     doctors[4].total_reviews = 50
+    
+    # Print initial setup for debugging
+    print("\nTest doctors setup:")
+    for i, doctor in enumerate(doctors):
+        print(f"Doctor {i}: spec={doctor.specialization}, city={doctor.city}, " +
+              f"rating={doctor.rating}, reviews={doctor.total_reviews}")
+    
+    # Expected results for combined filter:
+    # doc0: Cardiologist, Mumbai, 4.5 rating, 100 reviews - MATCH
+    # doc1: Neurologist, Mumbai, 4.5 rating, 100 reviews - NO MATCH (wrong specialization)
+    # doc2: Cardiologist, Delhi, 4.5 rating, 100 reviews - NO MATCH (wrong city)
+    # doc3: Cardiologist, Mumbai, 3.5 rating, 100 reviews - NO MATCH (rating too low)
+    # doc4: Cardiologist, Mumbai, 4.5 rating, 50 reviews - NO MATCH (not enough reviews)
     
     # Save all doctors
     for doctor in doctors:
@@ -83,18 +100,18 @@ def test_search_doctors(database_service):
     assert all(d.specialization == "Cardiologist" for d in results)
     
     # Test city filter
-    results = database_service.search_doctors(city="Delhi")
-    assert len(results) == 1
-    assert results[0].city == "Delhi"
+    results = database_service.search_doctors(city="Mumbai")
+    assert len(results) == 4  # docs 0, 1, 3, 4 are in Mumbai
+    assert all(d.city == "Mumbai" for d in results)
     
     # Test rating filter
     results = database_service.search_doctors(min_rating=4.0)
-    assert len(results) == 4
+    assert len(results) == 4  # docs 0, 1, 2, 4 have rating >= 4.0
     assert all(d.rating >= 4.0 for d in results)
     
     # Test reviews filter
     results = database_service.search_doctors(min_reviews=75)
-    assert len(results) == 4
+    assert len(results) == 4  # docs 0, 1, 2, 3 have reviews >= 75
     assert all(d.total_reviews >= 75 for d in results)
     
     # Test limit
@@ -108,7 +125,21 @@ def test_search_doctors(database_service):
         min_rating=4.0,
         min_reviews=75
     )
-    assert len(results) == 3
+    
+    # Expected match is only doc0, since:
+    # - doc0 meets all criteria
+    # - doc1 is not a Cardiologist
+    # - doc2 is not in Mumbai
+    # - doc3 has rating < 4.0
+    # - doc4 has reviews < 75
+    print("\nExpected 1 match for combined filter (doc0).")
+    print(f"Got {len(results)} matches.")
+    
+    for i, doc in enumerate(results):
+        print(f"Result {i}: id={doc.id}, spec={doc.specialization}, city={doc.city}, " +
+              f"rating={doc.rating}, reviews={doc.total_reviews}")
+    
+    assert len(results) == 1  # Only doc0 matches all criteria
     assert all(
         d.specialization == "Cardiologist"
         and d.city == "Mumbai"
@@ -126,10 +157,12 @@ def test_get_doctor_stats(database_service):
             name=f"Dr. Doctor {i}",
             specialization="Cardiologist" if i % 2 == 0 else "Neurologist",
             city="Mumbai" if i % 3 == 0 else "Delhi",
+            city_tier=1 if i % 3 == 0 else 2,
             rating=4.5,
             total_reviews=100,
             locations=[f"Hospital {i}"],
-            contributing_sources=["practo"]
+            contributing_sources=["practo"],
+            profile_urls={"practo": f"https://practo.com/doctor{i}"}
         )
         for i in range(6)
     ]
@@ -163,10 +196,12 @@ def test_cleanup_old_data(database_service):
             name=f"Dr. Doctor {i}",
             specialization="Cardiologist",
             city="Mumbai",
+            city_tier=1,
             rating=4.5,
             total_reviews=100,
             locations=[f"Hospital {i}"],
             contributing_sources=["practo"],
+            profile_urls={"practo": f"https://practo.com/doctor{i}"},
             timestamp=now - timedelta(days=i * 10)  # Each doctor is 10 days older than the previous
         )
         for i in range(5)
