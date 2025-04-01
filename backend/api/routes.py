@@ -1,12 +1,12 @@
 from fastapi import APIRouter, HTTPException, Query
 from typing import List, Optional
 from datetime import datetime
+import logging
 
 from ..models.doctor import Doctor
 from ..services.discovery import DoctorDiscoveryService
-from ..services.database import DoctorDatabaseService
+from ..services.database import DatabaseService
 from ..services.verification import DoctorVerificationService
-from ..config import settings
 
 router = APIRouter(
     prefix="/api/v1",
@@ -16,8 +16,11 @@ router = APIRouter(
 
 # Initialize services
 discovery_service = DoctorDiscoveryService()
-database_service = DoctorDatabaseService()
+database_service = DatabaseService()
 verification_service = DoctorVerificationService()
+
+# Configure logger
+logger = logging.getLogger(__name__)
 
 @router.post("/search", response_model=List[Doctor])
 async def search_doctors(
@@ -62,7 +65,7 @@ async def search_doctors(
                 verified_doctors.append(verified_doctor)
             except Exception as e:
                 # Log verification error but continue with other doctors
-                print(f"Error verifying doctor {doctor.name}: {str(e)}")
+                logger.error(f"Error verifying doctor {doctor.name}: {str(e)}")
                 verified_doctors.append(doctor)
         
         # Save verified doctors to database

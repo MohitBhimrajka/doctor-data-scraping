@@ -10,7 +10,7 @@ class Doctor(BaseModel):
     name: str = Field(..., description="Full name of the doctor")
     specialization: str = Field(..., description="Medical specialization of the doctor")
     city: str = Field(..., description="City where the doctor practices")
-    city_tier: Optional[str] = Field(None, description="Tier of the city (Tier 1, 2, or 3)")
+    city_tier: Optional[int] = Field(None, description="Tier of the city (1, 2, or 3)")
     rating: float = Field(..., description="Doctor's rating out of 5")
     total_reviews: int = Field(..., description="Total number of reviews received")
     locations: List[str] = Field(default_factory=list, description="List of practice locations")

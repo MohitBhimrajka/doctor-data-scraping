@@ -36,53 +36,105 @@ class DoctorDiscoveryService:
     async def search_doctors(
         self,
         specialization: str,
-        city: str,
-        country: str = "India"
+        city: Optional[str] = None,
+        country: str = "India",
+        tiers: Optional[List[int]] = None
     ) -> List[Doctor]:
         """
-        Search for doctors by specialization and city.
+        Search for doctors by specialization and city or by tiers.
 
         Args:
             specialization: Medical specialization
-            city: City name
+            city: City name (optional if tiers is provided)
             country: Country name (default: India)
+            tiers: List of city tiers to search in (optional)
 
         Returns:
             List of Doctor objects
         """
         try:
-            # Get city information
-            city_info = self.city_service.get_city_by_name(city)
-            if not city_info:
-                logger.error(f"City not found: {city}")
-                return []
+            # Handle city-based search
+            if city:
+                # Get city information
+                city_info = self.city_service.get_city_by_name(city)
+                if not city_info:
+                    logger.error(f"City not found: {city}")
+                    return []
 
-            # Build search query
-            query = self._build_search_query(
-                specialization=specialization,
-                city=city,
-                country=country
-            )
+                # Build search query
+                query = self._build_search_query(
+                    specialization=specialization,
+                    city=city,
+                    country=country
+                )
 
-            # Process sources concurrently
-            sources = ["practo", "google", "justdial"]
-            tasks = [
-                self.process_source(source, query)
-                for source in sources
-            ]
-            results = await asyncio.gather(*tasks, return_exceptions=True)
+                # Process sources concurrently
+                sources = self._get_search_sources()
+                tasks = [
+                    self.process_source(source, query)
+                    for source in sources
+                ]
+                results = await asyncio.gather(*tasks, return_exceptions=True)
 
-            # Flatten and deduplicate results
-            doctors = []
-            seen_ids = set()
-            for source_doctors in results:
-                if isinstance(source_doctors, Exception):
-                    logger.error(f"Error processing source: {str(source_doctors)}")
-                    continue
-                for doctor in source_doctors:
+                # Flatten and deduplicate results
+                doctors = []
+                seen_ids = set()
+                for source_doctors in results:
+                    if isinstance(source_doctors, Exception):
+                        logger.error(f"Error processing source: {str(source_doctors)}")
+                        continue
+                    for doctor in source_doctors:
+                        if doctor.id not in seen_ids:
+                            seen_ids.add(doctor.id)
+                            doctors.append(doctor)
+
+            # Handle tier-based search
+            elif tiers:
+                # Get cities by tiers
+                cities = []
+                for tier in tiers:
+                    tier_cities = self.city_service.get_cities_by_tier(tier)
+                    cities.extend(tier_cities)
+
+                if not cities:
+                    logger.error(f"No cities found for tiers: {tiers}")
+                    return []
+
+                # Search in each city
+                all_doctors = []
+                for city_info in cities[:5]:  # Limit to first 5 cities to avoid excessive API calls
+                    # Build search query
+                    query = self._build_search_query(
+                        specialization=specialization,
+                        city=city_info.name,
+                        country=country
+                    )
+
+                    # Process sources concurrently
+                    sources = self._get_search_sources()
+                    tasks = [
+                        self.process_source(source, query)
+                        for source in sources
+                    ]
+                    results = await asyncio.gather(*tasks, return_exceptions=True)
+
+                    # Add doctors from this city
+                    for source_doctors in results:
+                        if isinstance(source_doctors, Exception):
+                            logger.error(f"Error processing source: {str(source_doctors)}")
+                            continue
+                        all_doctors.extend(source_doctors)
+
+                # Deduplicate results
+                doctors = []
+                seen_ids = set()
+                for doctor in all_doctors:
                     if doctor.id not in seen_ids:
                         seen_ids.add(doctor.id)
                         doctors.append(doctor)
+            else:
+                logger.error("Either city or tiers must be provided")
+                return []
 
             # Sort by confidence score
             doctors.sort(key=lambda x: x.confidence_score, reverse=True)

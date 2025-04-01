@@ -118,7 +118,7 @@ def test_render_doctor_profile(mock_streamlit, sample_doctors):
     
     # Verify
     mock_streamlit['plotly_chart'].assert_called_once()  # Radar chart
-    mock_streamlit['dataframe'].assert_called()  # Locations and sources tables
+    mock_streamlit['markdown'].assert_called()  # Markdown content for doctor info, locations and sources
 
 def test_render_doctor_comparison(mock_streamlit, sample_doctors):
     """Test rendering doctor comparison."""

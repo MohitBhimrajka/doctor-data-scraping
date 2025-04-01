@@ -11,7 +11,7 @@ def create_doctor_radar_chart(doctor: Dict) -> None:
     # Calculate normalized values
     values = [
         doctor['rating'] / 5.0,  # Rating (0-5)
-        min(doctor['reviews'] / 1000.0, 1.0),  # Reviews (normalized to 1000)
+        min(doctor['total_reviews'] / 1000.0, 1.0),  # Reviews (normalized to 1000)
         doctor['confidence_score'],  # Confidence (0-1)
         0.8,  # Experience (placeholder)
         len(doctor['contributing_sources']) / 4.0  # Verification (normalized to 4 sources)
@@ -83,8 +83,11 @@ def render_doctor_profile(doctor: Dict) -> None:
     
     # Profile URLs
     st.markdown("### Profile Links")
-    for source, url in doctor['profile_urls'].items():
-        st.markdown(f"- [{source}]({url})")
+    if doctor.get('profile_urls'):
+        for source, url in doctor['profile_urls'].items():
+            st.markdown(f"- [{source}]({url})")
+    else:
+        st.markdown("No profile links available")
     
     # Metrics Visualization
     st.markdown("### Performance Metrics")
@@ -110,7 +113,7 @@ def render_doctor_comparison(doctors: List[Dict]) -> None:
             "Specialization": doctor['specialization'],
             "Location": f"{doctor['city']} (Tier {doctor['city_tier']})",
             "Rating": doctor['rating'],
-            "Reviews": doctor['reviews'],
+            "Reviews": doctor['total_reviews'],
             "Confidence": f"{doctor['confidence_score']*100:.1f}%",
             "Sources": len(doctor['contributing_sources'])
         })
@@ -130,7 +133,7 @@ def render_doctor_comparison(doctors: List[Dict]) -> None:
                 x=['Rating', 'Reviews', 'Confidence'],
                 y=[
                     doctor['rating'],
-                    doctor['reviews'] / 100,  # Normalize for better visualization
+                    doctor['total_reviews'] / 100,  # Normalize for better visualization
                     doctor['confidence_score'] * 100
                 ]
             ))

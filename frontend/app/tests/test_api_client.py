@@ -58,9 +58,9 @@ async def test_search_doctors(api_client, mock_httpx, sample_doctor):
     """Test searching doctors."""
     # Setup
     mock_response = MagicMock()
-    mock_response.json.return_value = {'doctors': [sample_doctor]}
+    mock_response.json.return_value = [sample_doctor]
     mock_response.status_code = 200
-    mock_httpx.return_value.get.return_value.__aenter__.return_value = mock_response
+    mock_httpx.return_value.post.return_value.__aenter__.return_value = mock_response
     
     # Execute
     result = await api_client.search_doctors(
@@ -74,7 +74,8 @@ async def test_search_doctors(api_client, mock_httpx, sample_doctor):
     
     # Verify
     assert result['doctors'] == [sample_doctor]
-    mock_httpx.return_value.get.assert_called_once()
+    assert result['total'] == 1
+    mock_httpx.return_value.post.assert_called_once()
 
 @pytest.mark.asyncio
 async def test_get_doctor(api_client, mock_httpx, sample_doctor):
@@ -114,14 +115,14 @@ async def test_search_doctors_404(api_client, mock_httpx):
     # Setup
     mock_response = MagicMock()
     mock_response.status_code = 404
-    mock_httpx.return_value.get.return_value.__aenter__.return_value = mock_response
+    mock_httpx.return_value.post.return_value.__aenter__.return_value = mock_response
     
     # Execute
     result = await api_client.search_doctors(specialization='Invalid')
     
     # Verify
     assert result['doctors'] == []
-    mock_httpx.return_value.get.assert_called_once()
+    mock_httpx.return_value.post.assert_called_once()
 
 @pytest.mark.asyncio
 async def test_get_doctor_404(api_client, mock_httpx):
@@ -139,14 +140,13 @@ async def test_get_doctor_404(api_client, mock_httpx):
 async def test_search_doctors_error(api_client, mock_httpx):
     """Test handling general error in search."""
     # Setup
-    mock_httpx.return_value.get.side_effect = httpx.RequestError("Network error")
+    mock_httpx.return_value.post.side_effect = httpx.RequestError("Network error")
     
-    # Execute
-    result = await api_client.search_doctors(specialization='Cardiologist')
+    # Execute and verify
+    with pytest.raises(Exception, match="Error searching doctors"):
+        await api_client.search_doctors(specialization='Cardiologist')
     
-    # Verify
-    assert result['doctors'] == []
-    mock_httpx.return_value.get.assert_called_once()
+    mock_httpx.return_value.post.assert_called_once()
 
 @pytest.mark.asyncio
 async def test_get_doctor_error(api_client, mock_httpx):
