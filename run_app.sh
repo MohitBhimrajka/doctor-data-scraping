@@ -1,181 +1,130 @@
 #!/bin/bash
 
-# Colors for output
+# ANSI color codes for formatting
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+MAGENTA='\033[0;35m'
+CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
-# Function to print colored messages
-print_message() {
-    echo -e "${2}${1}${NC}"
+# Function to display section headers
+function section() {
+    echo -e "\n${BLUE}=============================================${NC}"
+    echo -e "${BLUE}   $1${NC}"
+    echo -e "${BLUE}=============================================${NC}\n"
 }
 
-# Function to check if a command exists
-command_exists() {
-    command -v "$1" >/dev/null 2>&1
+# Function to display success messages
+function success() {
+    echo -e "${GREEN}✅ $1${NC}"
 }
 
-# Function to check Python version
-check_python_version() {
-    if command_exists python3; then
-        PYTHON_VERSION=$(python3 -c 'import sys; print(".".join(map(str, sys.version_info[:2])))')
-        # Split version into major and minor
-        MAJOR=$(echo $PYTHON_VERSION | cut -d. -f1)
-        MINOR=$(echo $PYTHON_VERSION | cut -d. -f2)
-        
-        if [ "$MAJOR" -ge 3 ] && [ "$MINOR" -ge 8 ]; then
-            print_message "Python version $PYTHON_VERSION detected" "$GREEN"
-            return 0
-        else
-            print_message "Python version $PYTHON_VERSION detected. Version 3.8 or higher is required." "$RED"
-            return 1
-        fi
-    else
-        print_message "Python 3 is not installed" "$RED"
-        return 1
-    fi
+# Function to display warning messages
+function warning() {
+    echo -e "${YELLOW}⚠️  $1${NC}"
 }
 
-# Function to create and activate virtual environment
-setup_virtual_env() {
-    if [ ! -d "venv" ]; then
-        print_message "Creating virtual environment..." "$YELLOW"
-        python3 -m venv venv
-    fi
+# Function to display error messages
+function error() {
+    echo -e "${RED}❌ $1${NC}"
+}
+
+# Function to display info messages
+function info() {
+    echo -e "${CYAN}ℹ️  $1${NC}"
+}
+
+# Function to display step messages
+function step() {
+    echo -e "${MAGENTA}▶️  $1${NC}"
+}
+
+# Check if Python is installed
+if ! command -v python3 &> /dev/null
+then
+    error "Python 3 is not installed. Please install Python 3 and try again."
+    exit 1
+fi
+
+# Check if Node.js is installed
+if ! command -v node &> /dev/null
+then
+    error "Node.js is not installed. Please install Node.js and try again."
+    exit 1
+fi
+
+# Check if npm is installed
+if ! command -v npm &> /dev/null
+then
+    error "npm is not installed. Please install npm and try again."
+    exit 1
+fi
+
+section "DOCTOR SEARCH APPLICATION STARTUP"
+
+info "Environment setup in progress..."
+
+# Load environment variables
+if [ -f .env ]; then
+    step "Loading environment variables from .env file"
+    source .env
+else
+    warning "No .env file found in the root directory"
     
-    # Activate virtual environment
-    source venv/bin/activate
-    
-    # Upgrade pip
-    print_message "Upgrading pip..." "$YELLOW"
-    pip install --upgrade pip
-}
-
-# Function to install dependencies
-install_dependencies() {
-    print_message "Installing dependencies..." "$YELLOW"
-    
-    # Install backend dependencies
-    if [ -f "requirements.txt" ]; then
-        pip install -r requirements.txt
-    fi
-    
-    # Install frontend dependencies
-    if [ -f "frontend/app/requirements.txt" ]; then
-        pip install -r frontend/app/requirements.txt
-    fi
-}
-
-# Function to check environment variables
-check_env_vars() {
-    if [ ! -f ".env" ]; then
-        print_message "Creating .env file from template..." "$YELLOW"
-        cp .env.example .env
-        print_message "Please update the .env file with your configuration" "$YELLOW"
+    # Check if GEMINI_API_KEY is set
+    if [ -z "$GEMINI_API_KEY" ]; then
+        error "GEMINI_API_KEY environment variable is not set."
+        echo "Please create a .env file in the root directory with the following content:"
+        echo "GEMINI_API_KEY=your_gemini_api_key_here"
+        echo "You can get an API key from https://ai.google.dev/"
         exit 1
     fi
-}
-
-# Function to run API validation tests
-run_api_tests() {
-    print_message "Running API validation tests..." "$YELLOW"
-    # Set PYTHONPATH to include the project root
-    export PYTHONPATH=$PYTHONPATH:$(pwd)
-    
-    # Run backend tests
-    print_message "Running backend tests..." "$YELLOW"
-    if python3 -m pytest backend/tests/ -v; then
-        print_message "Backend tests passed!" "$GREEN"
-    else
-        print_message "Warning: Backend tests failed. The application may not work correctly." "$RED"
-        print_message "Do you want to continue anyway? (y/n)" "$YELLOW"
-        read -r response
-        if [[ "$response" =~ ^[Yy]$ ]]; then
-            return 0
-        else
-            return 1
-        fi
-    fi
-    
-    # Run frontend tests
-    print_message "Running frontend tests..." "$YELLOW"
-    if python3 -m pytest frontend/app/tests/ -v; then
-        print_message "Frontend tests passed!" "$GREEN"
-    else
-        print_message "Warning: Frontend tests failed. The application may not work correctly." "$RED"
-        print_message "Do you want to continue anyway? (y/n)" "$YELLOW"
-        read -r response
-        if [[ "$response" =~ ^[Yy]$ ]]; then
-            return 0
-        else
-            return 1
-        fi
-    fi
-}
-
-# Function to start the backend server
-start_backend() {
-    print_message "Starting backend server..." "$YELLOW"
-    cd backend
-    uvicorn main:app --reload --port 8000 &
-    BACKEND_PID=$!
-    cd ..
-}
-
-# Function to start the frontend server
-start_frontend() {
-    print_message "Starting frontend server..." "$YELLOW"
-    cd frontend/app
-    streamlit run main.py --server.port 8501 &
-    FRONTEND_PID=$!
-    cd ../..
-}
-
-# Function to handle cleanup on exit
-cleanup() {
-    print_message "\nShutting down servers..." "$YELLOW"
-    kill $BACKEND_PID 2>/dev/null
-    kill $FRONTEND_PID 2>/dev/null
-    deactivate
-    print_message "Servers stopped" "$GREEN"
-    exit 0
-}
-
-# Set up trap for cleanup
-trap cleanup SIGINT SIGTERM
-
-# Main script
-print_message "Starting Doctor Discovery Application..." "$GREEN"
-
-# Check Python version
-if ! check_python_version; then
-    exit 1
 fi
 
-# Setup virtual environment
-setup_virtual_env
-
-# Install dependencies
-install_dependencies
-
-# Check environment variables
-check_env_vars
-
-# Run API validation tests
-if ! run_api_tests; then
-    print_message "Exiting due to API validation test failure" "$RED"
-    exit 1
+# Delete the database file if it exists to ensure schema consistency
+if [ -f doctors.db ]; then
+    step "Removing old database file"
+    rm doctors.db
+    success "Old database removed successfully"
 fi
 
-# Start servers
-start_backend
-start_frontend
+# Install backend dependencies
+section "SETTING UP BACKEND"
+step "Installing backend dependencies"
+pip install -r requirements.txt
+success "Backend dependencies installed successfully"
 
-print_message "\nApplication started successfully!" "$GREEN"
-print_message "Backend running at: http://localhost:8000" "$GREEN"
-print_message "Frontend running at: http://localhost:8501" "$GREEN"
-print_message "\nPress Ctrl+C to stop the servers" "$YELLOW"
+# Install frontend dependencies
+section "SETTING UP FRONTEND"
+step "Installing frontend dependencies"
+cd frontend && npm install
+success "Frontend dependencies installed successfully"
+cd ..
 
-# Wait for user input
-wait 
+# Start the backend server in the background
+section "STARTING BACKEND SERVER"
+step "Starting backend server on http://localhost:8000"
+python server.py &
+BACKEND_PID=$!
+
+# Wait for the backend to start
+sleep 3
+
+# Start the frontend server in the foreground
+section "STARTING FRONTEND SERVER"
+step "Starting frontend server on http://localhost:3000"
+cd frontend && npm run dev &
+FRONTEND_PID=$!
+
+# Print helpful message
+section "APPLICATION STARTUP COMPLETE"
+success "Doctor Search App is running!"
+echo -e "⭐ Backend API: ${GREEN}http://localhost:8000${NC}"
+echo -e "⭐ Frontend UI: ${GREEN}http://localhost:3000${NC}"
+echo
+info "Press Ctrl+C to stop both servers"
+
+# Wait for both processes
+wait $BACKEND_PID $FRONTEND_PID 

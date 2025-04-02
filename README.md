@@ -1,138 +1,116 @@
-# Doctor Search API
+# Doctor Search Application
 
-A FastAPI-based backend service for searching and retrieving doctor information using Google's Gemini AI.
+This application allows users to search for doctors across multiple sources based on city and specialization.
 
-## Features
+## Components
 
-- Search doctors by specialization and location
-- Verify doctor information from multiple sources
-- Store and retrieve doctor data
-- Get doctor statistics
-- Pagination support
-- Rate limiting and caching
-- Comprehensive error handling
+The application consists of two main components:
 
-## Prerequisites
+1. **Backend API** (FastAPI): Handles doctor searches across multiple data sources.
+2. **Frontend** (HTML/JavaScript): Provides an intuitive user interface for searching doctors.
 
-- Python 3.8+
-- Google Gemini API key
-- Virtual environment (recommended)
+## Getting Started
 
-## Setup
+### Prerequisites
+
+- Python 3.10 or higher
+- Node.js 14 or higher
+- npm (comes with Node.js)
+
+### Installation and Setup
 
 1. Clone the repository:
-```bash
-git clone <repository-url>
-cd doctor-data-scraping
-```
+   ```
+   git clone <repository-url>
+   cd doctor-search-app
+   ```
 
-2. Create and activate a virtual environment:
-```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-```
+2. Set up Python environment and install backend dependencies:
+   ```
+   python -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   pip install -r requirements.txt
+   ```
 
-3. Install dependencies:
-```bash
-pip install -r requirements.txt
-```
+3. Set up frontend dependencies:
+   ```
+   cd frontend
+   npm install
+   cd ..
+   ```
 
-4. Create a `.env` file in the root directory:
-```env
-GEMINI_API_KEY=your_api_key_here
-```
+4. Create a `.env` file in the root directory with the following variables:
+   ```
+   GEMINI_API_KEY=your_api_key
+   ```
 
-## Running the Application
+5. Create a `.env` file in the frontend directory with:
+   ```
+   BACKEND_API_URL=http://localhost:8000
+   PORT=3000
+   ```
 
-1. Start the server:
-```bash
-uvicorn backend.main:app --reload
-```
+### Running the Application Locally
 
-2. Access the API documentation:
-- Swagger UI: http://localhost:8000/api/docs
-- ReDoc: http://localhost:8000/api/redoc
+1. Start the backend server:
+   ```
+   python server.py
+   ```
+
+2. In a separate terminal, start the frontend server:
+   ```
+   cd frontend
+   npm run dev
+   ```
+
+3. Access the application in your browser at `http://localhost:3000`
 
 ## API Endpoints
 
-### Search Doctors
-```http
-POST /api/v1/search
-```
+The backend provides the following API endpoints:
 
-Parameters:
-- `specialization` (required): Doctor's specialization
-- `city` (optional): City name
-- `country` (optional): Country name (defaults to India)
-- `tiers` (optional): List of city tiers
-- `page` (optional): Page number (default: 1)
-- `page_size` (optional): Results per page (default: 10, max: 100)
+- `POST /api/search`: Search for doctors in a specific city with a specific specialization
+- `POST /api/search/countrywide`: Search for doctors across all of India
+- `POST /api/search/tier`: Search for doctors in a specific city tier (tier1, tier2, tier3)
+- `POST /api/search/custom`: Search for doctors in a list of specified cities
+- `GET /health`: Health check endpoint
 
-### Get Doctor Details
-```http
-GET /api/v1/doctor/{doctor_id}
-```
+## Deployment
 
-### Get Statistics
-```http
-GET /api/v1/stats
-```
+The application is configured for deployment on Render.com using the `render.yaml` file.
 
-## Development
+### Render Deployment Steps
 
-### Running Tests
-```bash
-pytest
-```
+1. Fork or copy this repository to your own GitHub account.
+2. Create a new Web Service on Render and select your repository.
+3. Choose "Use render.yaml" when prompted.
+4. Set the environment variables as needed in the Render dashboard.
 
-### Code Formatting
-```bash
-black .
-```
+## Architecture
 
-## Project Structure
+- The backend uses FastAPI to provide API endpoints for doctor searches.
+- The frontend is built using HTML, CSS, and JavaScript, providing a responsive user interface.
+- Communication between frontend and backend is handled via RESTful API calls.
+
+## Directory Structure
 
 ```
-backend/
-├── api/
-│   └── routes.py
-├── models/
-│   ├── doctor.py
-│   └── city.py
-├── services/
-│   ├── discovery.py
-│   ├── verification.py
-│   └── database.py
-├── utils/
-│   ├── client.py
-│   └── city_cache.py
-├── config.py
-└── main.py
+doctor-search-app/
+├── frontend/                # HTML/JavaScript frontend
+│   ├── public/              # Public assets
+│   │   ├── index.html       # Main HTML file
+│   │   ├── styles.css       # CSS styles
+│   │   └── app.js           # JavaScript application logic
+│   ├── assets/              # Static assets (images, etc.)
+│   ├── server.js            # Express server for frontend
+│   └── package.json         # Node.js dependencies
+├── .env                     # Environment variables
+├── server.py                # FastAPI backend server
+├── doctor_search_enhanced.py # Core search functionality
+├── render.yaml              # Render deployment configuration
+├── requirements.txt         # Python dependencies
+└── run_render.sh            # Script for running on Render
 ```
-
-## Error Handling
-
-The API includes comprehensive error handling for:
-- Validation errors (422)
-- Not found errors (404)
-- Server errors (500)
-- Rate limiting (429)
-
-## Performance Considerations
-
-- Concurrent processing for multiple sources
-- In-memory caching for city data
-- Rate limiting for API calls
-- Pagination for large result sets
-- Efficient data storage and retrieval
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
 
 ## License
 

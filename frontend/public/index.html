@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Doctor Search - Powered by Supervity</title>
+    <link rel="shortcut icon" href="/assets/icon.png" type="image/png">
+    <link rel="stylesheet" href="styles.css">
+    <!-- Font Awesome for icons -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <!-- Google Material Icons -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- SheetJS for Excel export -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.19.3/package/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+    <!-- Loading Container -->
+    <div class="loading-container" style="display: none;">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">Processing your request...</div>
+        <div class="progress-container" style="margin-top: 20px; width: 300px;">
+            <div class="progress-bar" id="search-progress-bar" style="width: 0%;"></div>
+        </div>
+        <p class="progress-text" id="search-progress-text" style="margin-top: 10px; font-size: 14px; color: #486581;">Initializing search...</p>
+    </div>
+    
+    <div class="app-container">
+        <!-- Header Section -->
+        <header class="app-header">
+            <div class="logo-container">
+                <img src="/assets/logo.png" alt="Doctor Search Logo" class="logo">
+            </div>
+            <h1 class="title">Find the Best Doctor for Your Needs</h1>
+            <p class="subtitle">AI-powered doctor search across multiple sources</p>
+        </header>
+
+        <!-- Main Content Section -->
+        <main class="search-container">
+            <!-- Tabs Navigation -->
+            <div class="tabs-container">
+                <div class="tabs-nav">
+                    <button class="tab-btn active" data-tab="single-city">
+                        <i class="material-icons">location_city</i>
+                        <span>Single City</span>
+                    </button>
+                    <button class="tab-btn" data-tab="tier-wise">
+                        <i class="material-icons">layers</i>
+                        <span>Tier-wise</span>
+                    </button>
+                    <button class="tab-btn" data-tab="custom-cities">
+                        <i class="material-icons">tune</i>
+                        <span>Custom Cities</span>
+                    </button>
+                    <button class="tab-btn" data-tab="countrywide">
+                        <i class="material-icons">public</i>
+                        <span>Countrywide</span>
+                    </button>
+                </div>
+
+                <!-- Tab Content Panels -->
+                <div class="tab-content-container">
+                    <!-- Single City Search Tab -->
+                    <div class="tab-content active" id="single-city">
+                        <h3 class="section-heading">Search in a Specific City</h3>
+                        
+                        <div class="input-group">
+                            <label for="city-input">Type a city name or select from the list</label>
+                            <div class="combobox-container">
+                                <input type="text" id="city-input" placeholder="e.g., Mumbai, Delhi, Bangalore" list="city-list">
+                                <datalist id="city-list">
+                                    <!-- Cities will be populated via JavaScript -->
+                                </datalist>
+                            </div>
+                        </div>
+                        
+                        <div class="city-info-container"></div>
+                        
+                        <h3 class="section-heading">Specialization</h3>
+                        
+                        <div class="input-group">
+                            <label>Select specialization type</label>
+                            <div class="radio-group">
+                                <label class="radio-container">
+                                    <input type="radio" name="spec-type-single" value="common" checked>
+                                    <span class="radio-label">Common Specializations</span>
+                                </label>
+                                <label class="radio-container">
+                                    <input type="radio" name="spec-type-single" value="custom">
+                                    <span class="radio-label">Custom Specialization</span>
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div class="input-group spec-common-container">
+                            <label for="spec-common-single">Choose a specialization</label>
+                            <select id="spec-common-single">
+                                <!-- Specializations will be populated via JavaScript -->
+                            </select>
+                        </div>
+                        
+                        <div class="input-group spec-custom-container hidden">
+                            <label for="spec-custom-single">Enter specialization</label>
+                            <input type="text" id="spec-custom-single" placeholder="Enter any type of medical specialist">
+                        </div>
+                        
+                        <div class="info-banner">
+                            <i class="material-icons">schedule</i>
+                            Estimated search time: 30-60 seconds
+                        </div>
+                        
+                        <div class="search-button-container">
+                            <button class="primary-btn" id="single-city-search">
+                                <i class="material-icons">search</i> Search
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Tier-wise Search Tab -->
+                    <div class="tab-content" id="tier-wise">
+                        <h3 class="section-heading">Search by City Tier</h3>
+                        
+                        <div class="input-group">
+                            <label for="tier-select">Select city tier</label>
+                            <select id="tier-select">
+                                <option value="tier1">Tier 1 (Major Metro Cities)</option>
+                                <option value="tier2">Tier 2 (Mid-sized Cities)</option>
+                                <option value="tier3">Tier 3 (Smaller Cities)</option>
+                            </select>
+                        </div>
+                        
+                        <div id="tier-description" class="info-banner">
+                            Includes major metropolitan areas like Mumbai, Delhi, Bangalore
+                        </div>
+                        
+                        <div class="expander">
+                            <div class="expander-header" onclick="this.parentElement.classList.toggle('active')">
+                                <span class="expander-title">Cities in <span id="tier-label">Tier 1 (Major Metro Cities)</span></span>
+                                <span class="expander-icon"><i class="fas fa-chevron-down"></i></span>
+                            </div>
+                            <div class="expander-content">
+                                <div class="cities-grid" id="tier-cities-list">
+                                    <!-- Cities will be populated via JavaScript -->
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <h3 class="section-heading">Specialization</h3>
+                        
+                        <div class="input-group">
+                            <label>Select specialization type</label>
+                            <div class="radio-group">
+                                <label class="radio-container">
+                                    <input type="radio" name="spec-type-tier" value="common" checked>
+                                    <span class="radio-label">Common Specializations</span>
+                                </label>
+                                <label class="radio-container">
+                                    <input type="radio" name="spec-type-tier" value="custom">
+                                    <span class="radio-label">Custom Specialization</span>
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div class="input-group spec-common-container-tier">
+                            <label for="spec-common-tier">Choose a specialization</label>
+                            <select id="spec-common-tier">
+                                <!-- Specializations will be populated via JavaScript -->
+                            </select>
+                        </div>
+                        
+                        <div class="input-group spec-custom-container-tier hidden">
+                            <label for="spec-custom-tier">Enter specialization</label>
+                            <input type="text" id="spec-custom-tier" placeholder="Enter any type of medical specialist">
+                        </div>
+                        
+                        <div id="tier-search-info" class="info-banner">
+                            Searching across 10 cities. Estimated search time: 5-10 minutes
+                        </div>
+                        
+                        <div class="search-button-container">
+                            <button class="search-button" id="tier-search">
+                                <i class="fas fa-search"></i> Search Tier 1 Cities
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Custom Cities Search Tab -->
+                    <div class="tab-content" id="custom-cities">
+                        <h3 class="section-heading">Create a Custom City Selection</h3>
+                        
+                        <!-- Wizard Progress Indicator -->
+                        <div class="progress-indicator">
+                            <div class="progress-line"></div>
+                            <div class="progress-step active" data-step="1">1</div>
+                            <div class="progress-step" data-step="2">2</div>
+                            <div class="progress-step" data-step="3">3</div>
+                        </div>
+                        
+                        <!-- Step 1: Select Cities -->
+                        <div class="wizard-step active" data-step="1">
+                            <h4 class="subsection-heading">Step 1: Select Cities</h4>
+                            
+                            <h5 class="group-heading">Quick Selection</h5>
+                            <div class="input-group">
+                                <div class="radio-group city-quick-select">
+                                    <label class="radio-container">
+                                        <input type="radio" name="quick-cities" value="custom" checked>
+                                        <span class="radio-label">Custom Selection</span>
+                                    </label>
+                                    <label class="radio-container">
+                                        <input type="radio" name="quick-cities" value="metro">
+                                        <span class="radio-label">Top 5 Metro Cities</span>
+                                    </label>
+                                    <label class="radio-container">
+                                        <input type="radio" name="quick-cities" value="south">
+                                        <span class="radio-label">South India</span>
+                                    </label>
+                                    <label class="radio-container">
+                                        <input type="radio" name="quick-cities" value="north">
+                                        <span class="radio-label">North India</span>
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <div id="quick-selection-info" class="success-message hidden"></div>
+                            
+                            <div id="custom-selection-container">
+                                <h5 class="group-heading">Custom Selection</h5>
+                                <p>Select cities from each tier:</p>
+                                
+                                <div class="city-tabs">
+                                    <div class="city-tabs-nav">
+                                        <button class="city-tab-btn active" data-tab="tier1-cities">Tier 1 Cities</button>
+                                        <button class="city-tab-btn" data-tab="tier2-cities">Tier 2 Cities</button>
+                                        <button class="city-tab-btn" data-tab="tier3-cities">Tier 3 Cities</button>
+                                    </div>
+                                    
+                                    <div class="city-tab-content active" id="tier1-cities">
+                                        <div class="city-selection" id="tier1-cities-select">
+                                            <!-- Will be populated with checkboxes via JavaScript -->
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="city-tab-content" id="tier2-cities">
+                                        <div class="city-selection" id="tier2-cities-select">
+                                            <!-- Will be populated with checkboxes via JavaScript -->
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="city-tab-content" id="tier3-cities">
+                                        <div class="city-selection" id="tier3-cities-select">
+                                            <!-- Will be populated with checkboxes via JavaScript -->
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div id="custom-selection-summary" class="info-banner hidden"></div>
+                            
+                            <div class="wizard-buttons">
+                                <button class="primary-button next-button" id="cities-continue" disabled>
+                                    Continue to Specialization
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Step 2: Select Specialization -->
+                        <div class="wizard-step" data-step="2">
+                            <h4 class="subsection-heading">Step 2: Select Specialization</h4>
+                            
+                            <div id="selected-cities-summary" class="info-banner"></div>
+                            
+                            <div class="input-group">
+                                <label>Select specialization type</label>
+                                <div class="radio-group">
+                                    <label class="radio-container">
+                                        <input type="radio" name="spec-type-custom" value="common" checked>
+                                        <span class="radio-label">Common Specializations</span>
+                                    </label>
+                                    <label class="radio-container">
+                                        <input type="radio" name="spec-type-custom" value="custom">
+                                        <span class="radio-label">Custom Specialization</span>
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <div class="input-group spec-common-container-custom">
+                                <label for="spec-common-custom">Choose a specialization</label>
+                                <select id="spec-common-custom">
+                                    <!-- Specializations will be populated via JavaScript -->
+                                </select>
+                            </div>
+                            
+                            <div class="input-group spec-custom-container-custom hidden">
+                                <label for="spec-custom-custom">Enter specialization</label>
+                                <input type="text" id="spec-custom-custom" placeholder="Enter any type of medical specialist">
+                            </div>
+                            
+                            <div class="wizard-buttons">
+                                <button class="secondary-button back-button" id="back-to-cities">
+                                    Back to City Selection
+                                </button>
+                                <button class="primary-button next-button" id="continue-to-review" disabled>
+                                    Continue to Review
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Step 3: Review and Search -->
+                        <div class="wizard-step" data-step="3">
+                            <h4 class="subsection-heading">Step 3: Review and Search</h4>
+                            
+                            <div class="card summary-card">
+                                <h5 class="summary-heading">Search Summary</h5>
+                                
+                                <div class="summary-grid">
+                                    <div class="summary-section">
+                                        <span class="summary-label">Cities:</span>
+                                        <span class="summary-value" id="summary-cities"></span>
+                                        
+                                        <span class="summary-label">Total Cities:</span>
+                                        <span class="summary-value" id="summary-cities-count"></span>
+                                    </div>
+                                    
+                                    <div class="summary-section">
+                                        <span class="summary-label">Specialization:</span>
+                                        <span class="summary-value" id="summary-specialization"></span>
+                                        
+                                        <span class="summary-label">Estimated Search Time:</span>
+                                        <span class="summary-value" id="summary-search-time"></span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="wizard-buttons">
+                                <button class="secondary-button" id="edit-search">
+                                    Edit Search
+                                </button>
+                                <button class="primary-button search-button" id="start-custom-search">
+                                    <i class="fas fa-search"></i> Start Search
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Countrywide Search Tab -->
+                    <div class="tab-content" id="countrywide">
+                        <h3 class="section-heading">Countrywide Search (India)</h3>
+                        
+                        <p>This search will find doctors across all major cities in India</p>
+                        
+                        <div class="expander">
+                            <div class="expander-header" onclick="this.parentElement.classList.toggle('active')">
+                                <span class="expander-title">View cities being searched</span>
+                                <span class="expander-icon"><i class="fas fa-chevron-down"></i></span>
+                            </div>
+                            <div class="expander-content">
+                                <div class="cities-grid countrywide-cities">
+                                    <div class="cities-column">
+                                        <h5 class="city-heading">Tier 1 Cities</h5>
+                                        <div class="city-list" id="countrywide-tier1">
+                                            <!-- Will be populated via JavaScript -->
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="cities-column">
+                                        <h5 class="city-heading">Tier 2 Cities</h5>
+                                        <div class="city-list" id="countrywide-tier2">
+                                            <!-- Will be populated via JavaScript -->
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="cities-column">
+                                        <h5 class="city-heading">Tier 3 Cities</h5>
+                                        <div class="city-list" id="countrywide-tier3">
+                                            <!-- Will be populated via JavaScript -->
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="info-banner">
+                                    During the countrywide search, we search all Tier 1 cities plus a random sample of cities from Tier 2 and Tier 3 to maximize coverage while maintaining performance.
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <h3 class="section-heading">Specialization</h3>
+                        
+                        <div class="input-group">
+                            <label>Select specialization type</label>
+                            <div class="radio-group">
+                                <label class="radio-container">
+                                    <input type="radio" name="spec-type-country" value="common" checked>
+                                    <span class="radio-label">Common Specializations</span>
+                                </label>
+                                <label class="radio-container">
+                                    <input type="radio" name="spec-type-country" value="custom">
+                                    <span class="radio-label">Custom Specialization</span>
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div class="input-group spec-common-container-country">
+                            <label for="spec-common-country">Choose a specialization</label>
+                            <select id="spec-common-country">
+                                <!-- Specializations will be populated via JavaScript -->
+                            </select>
+                        </div>
+                        
+                        <div class="input-group spec-custom-container-country hidden">
+                            <label for="spec-custom-country">Enter specialization</label>
+                            <input type="text" id="spec-custom-country" placeholder="Enter any type of medical specialist">
+                        </div>
+                        
+                        <div class="info-banner">Estimated search time: 15-20 minutes</div>
+                        
+                        <div class="search-button-container">
+                            <button class="search-button" id="country-search">
+                                <i class="fas fa-search"></i> Countrywide Search
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Results Section (initially hidden) -->
+        <section class="results-container hidden" id="results-section">
+            <div class="results-header">
+                <h2 id="results-title">Top Doctors</h2>
+                <div class="search-info-banner">
+                    <div class="search-metadata">
+                        <div class="metadata-item">
+                            <i class="material-icons">people</i> 
+                            Found <strong id="search-count">0</strong> doctors
+                        </div>
+                        <div class="metadata-item">
+                            <i class="material-icons">place</i> 
+                            In <strong id="search-location">-</strong>
+                        </div>
+                        <div class="metadata-item">
+                            <i class="material-icons">local_hospital</i> 
+                            Specialization: <strong id="search-specialization">-</strong>
+                        </div>
+                        <div class="metadata-item">
+                            <i class="material-icons">timer</i> 
+                            Search took <strong id="search-time">0</strong>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Action buttons -->
+            <div class="action-buttons">
+                <button id="back-to-search" class="btn">
+                    <i class="material-icons">arrow_back</i>
+                    Back to Search
+                </button>
+                <button id="export-excel" class="btn btn-primary">
+                    <i class="material-icons">description</i>
+                    Export to Excel
+                </button>
+            </div>
+            
+            <!-- Search and filter controls -->
+            <div class="results-controls">
+                <div class="results-search-container">
+                    <i class="material-icons">search</i>
+                    <input type="text" id="results-search" placeholder="Search (Name/Location)">
+                </div>
+                <div class="rating-filter">
+                    <span class="filter-label"><i class="material-icons">star</i> Minimum Rating:</span>
+                    <input type="range" id="min-rating" min="0" max="5" step="0.5" value="0">
+                    <span id="rating-value">0</span>
+                </div>
+                <div class="sort-filter">
+                    <i class="material-icons">sort</i>
+                    <span class="filter-label">Sort By:</span>
+                    <select id="sort-by">
+                        <option value="rating">Rating ↓</option>
+                        <option value="reviews">Reviews ↓</option>
+                        <option value="name">Name</option>
+                        <option value="city">City</option>
+                    </select>
+                </div>
+            </div>
+            
+            <!-- Single Unified Doctors Table -->
+            <div id="doctors-section" class="doctors-section">
+                <div class="doctors-table-container">
+                    <table class="doctors-table" id="doctors-table">
+                        <thead>
+                            <tr>
+                                <th width="22%">Name</th>
+                                <th width="10%">Rating</th>
+                                <th width="8%">Reviews</th>
+                                <th width="30%">Locations</th>
+                                <th width="10%">City</th>
+                                <th width="20%">Sources</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Will be populated via JavaScript -->
+                        </tbody>
+                    </table>
+                    <div class="no-results-message hidden">No doctors found matching your criteria.</div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- Footer -->
+        <footer class="app-footer">
+            <p>Built by Supervity</p>
+        </footer>
+    </div>
+
+    <!-- External Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="app.js"></script>
+</body>
+</html> 
