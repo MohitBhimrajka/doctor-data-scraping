@@ -750,8 +750,16 @@ const API = {
 // Single city search function
 async function searchSingleCity(city, specialization) {
     try {
+        console.log('Starting single city search');
+        
         // Show loading indicators
-        document.getElementById('loading-indicator').style.display = 'flex';
+        const loadingContainer = document.querySelector('.loading-container');
+        if (loadingContainer) {
+            loadingContainer.style.display = 'flex';
+            console.log('Loading container displayed');
+        } else {
+            console.error('Loading container not found in DOM');
+        }
         
         const searchParams = {
             type: 'city',
@@ -768,16 +776,28 @@ async function searchSingleCity(city, specialization) {
     } catch (error) {
         console.error('Error in searchSingleCity:', error);
         showAlert('error', 'Failed to search. Please try again.');
-        document.getElementById('loading-indicator').style.display = 'none';
+        
+        // Hide loading indicators
+        const loadingContainer = document.querySelector('.loading-container');
+        if (loadingContainer) {
+            loadingContainer.style.display = 'none';
+        }
     }
 }
 
 // Tier-wise search function
 async function searchByTier(tier, specialization) {
     try {
+        console.log('Starting tier search');
+        
         // Show loading indicators
-        document.getElementById('loading-indicator').style.display = 'flex';
-        document.querySelector('.results-progress').style.display = 'flex';
+        const loadingContainer = document.querySelector('.loading-container');
+        if (loadingContainer) {
+            loadingContainer.style.display = 'flex';
+            console.log('Loading container displayed');
+        } else {
+            console.error('Loading container not found in DOM');
+        }
         
         const searchParams = {
             type: 'tier',
@@ -794,17 +814,28 @@ async function searchByTier(tier, specialization) {
     } catch (error) {
         console.error('Error in searchByTier:', error);
         showAlert('error', 'Failed to search. Please try again.');
-        document.getElementById('loading-indicator').style.display = 'none';
-        document.querySelector('.results-progress').style.display = 'none';
+        
+        // Hide loading indicators
+        const loadingContainer = document.querySelector('.loading-container');
+        if (loadingContainer) {
+            loadingContainer.style.display = 'none';
+        }
     }
 }
 
 // Custom cities search function
 async function searchCustomCities(cities, specialization) {
     try {
+        console.log('Starting custom cities search');
+        
         // Show loading indicators
-        document.getElementById('loading-indicator').style.display = 'flex';
-        document.querySelector('.results-progress').style.display = 'flex';
+        const loadingContainer = document.querySelector('.loading-container');
+        if (loadingContainer) {
+            loadingContainer.style.display = 'flex';
+            console.log('Loading container displayed');
+        } else {
+            console.error('Loading container not found in DOM');
+        }
         
         const searchParams = {
             type: 'custom',
@@ -821,17 +852,28 @@ async function searchCustomCities(cities, specialization) {
     } catch (error) {
         console.error('Error in searchCustomCities:', error);
         showAlert('error', 'Failed to search. Please try again.');
-        document.getElementById('loading-indicator').style.display = 'none';
-        document.querySelector('.results-progress').style.display = 'none';
+        
+        // Hide loading indicators
+        const loadingContainer = document.querySelector('.loading-container');
+        if (loadingContainer) {
+            loadingContainer.style.display = 'none';
+        }
     }
 }
 
 // Countrywide search function
 async function searchCountrywide(specialization) {
     try {
+        console.log('Starting countrywide search');
+        
         // Show loading indicators
-        document.getElementById('loading-indicator').style.display = 'flex';
-        document.querySelector('.results-progress').style.display = 'flex';
+        const loadingContainer = document.querySelector('.loading-container');
+        if (loadingContainer) {
+            loadingContainer.style.display = 'flex';
+            console.log('Loading container displayed');
+        } else {
+            console.error('Loading container not found in DOM');
+        }
         
         const searchParams = {
             type: 'countrywide',
@@ -847,8 +889,12 @@ async function searchCountrywide(specialization) {
     } catch (error) {
         console.error('Error in searchCountrywide:', error);
         showAlert('error', 'Failed to search. Please try again.');
-        document.getElementById('loading-indicator').style.display = 'none';
-        document.querySelector('.results-progress').style.display = 'none';
+        
+        // Hide loading indicators
+        const loadingContainer = document.querySelector('.loading-container');
+        if (loadingContainer) {
+            loadingContainer.style.display = 'none';
+        }
     }
 }
 
@@ -1159,21 +1205,64 @@ function toggleLocationDropdown(element) {
     }, 0);
 }
 
+// Ensure results section exists in DOM
+function ensureResultsSectionExists() {
+    let resultsSection = document.getElementById('results-section');
+    
+    if (!resultsSection) {
+        console.log('Results section not found, creating it dynamically');
+        
+        // Create results section
+        resultsSection = document.createElement('div');
+        resultsSection.id = 'results-section';
+        resultsSection.className = 'results-section';
+        
+        // Create summary section
+        const searchSummary = document.createElement('div');
+        searchSummary.id = 'search-summary';
+        searchSummary.className = 'search-summary';
+        searchSummary.innerHTML = `
+            <h2>Search Results: <span id="search-title">Doctors</span></h2>
+            <div class="summary-details">
+                <div class="summary-item">
+                    <strong>Found:</strong> <span id="result-count">0</span> doctors
+                </div>
+                <div class="summary-item">
+                    <strong>Location:</strong> <span id="search-location">-</span>
+                </div>
+            </div>
+        `;
+        
+        // Create table container
+        const tableContainer = document.createElement('div');
+        tableContainer.className = 'doctors-table-container';
+        
+        // Add to results section
+        resultsSection.appendChild(searchSummary);
+        resultsSection.appendChild(tableContainer);
+        
+        // Find content container and add results section
+        const mainContent = document.querySelector('main');
+        if (mainContent) {
+            mainContent.appendChild(resultsSection);
+        } else {
+            // If no main element, add to body
+            document.body.appendChild(resultsSection);
+        }
+    }
+    
+    return resultsSection;
+}
+
 // Display the search results in the UI
 function displaySearchResults(data, searchType, searchParams) {
-    // Hide all loaders
-    document.getElementById('loading-indicator').style.display = 'none';
-    document.querySelector('.results-progress').style.display = 'none';
+    console.log(`Displaying ${data.length} results for ${searchType} search:`, data);
     
     // Clear any existing alerts
     clearAlert();
     
-    // Get the results container
-    const resultsSection = document.getElementById('results-section');
-    
-    // Log what we received
-    console.log(`Displaying results for ${searchType} search:`, data);
-    console.log('Search params:', searchParams);
+    // Ensure results section exists
+    const resultsSection = ensureResultsSectionExists();
     
     // Handle empty results
     if (!data || !data.length) {
@@ -1184,6 +1273,7 @@ function displaySearchResults(data, searchType, searchParams) {
     
     // Show the results section
     resultsSection.style.display = 'block';
+    console.log('Results section is now visible');
     
     // Update UI based on search type
     updateSearchSummary(searchType, searchParams, data.length);
@@ -1257,16 +1347,21 @@ function showEmptyResultsMessage(searchType, params) {
 function handleSearchResponse(response, searchType, searchParams) {
     console.log(`Handling ${searchType} search response:`, response);
     
+    // Hide loading indicators
+    const loadingContainer = document.querySelector('.loading-container');
+    if (loadingContainer) {
+        loadingContainer.style.display = 'none';
+    }
+    
     if (!response || !response.success) {
         // Show error to user
         showAlert('error', response && response.message ? response.message : 'Failed to get search results. Please try again.');
-        document.getElementById('loading-indicator').style.display = 'none';
-        document.querySelector('.results-progress').style.display = 'none';
         return;
     }
     
     // Ensure we have a data array
     const doctorsData = response.data || [];
+    console.log(`Found ${doctorsData.length} doctors`);
     
     // Display the results
     displaySearchResults(doctorsData, searchType, searchParams);
@@ -2285,6 +2380,7 @@ function populateDoctorsTable(doctorsData) {
     const tableContainer = document.querySelector('.doctors-table-container');
     if (!tableContainer) {
         console.error('Table container not found!');
+        showAlert('error', 'Error displaying results: Table container not found');
         return;
     }
     
@@ -2293,6 +2389,7 @@ function populateDoctorsTable(doctorsData) {
     
     // Create the table
     const table = document.createElement('table');
+    table.id = 'doctors-table';
     table.className = 'doctors-table';
     
     // Create the table header
@@ -2305,6 +2402,7 @@ function populateDoctorsTable(doctorsData) {
         { id: 'rating', label: 'Rating', sortable: true },
         { id: 'reviews', label: 'Reviews', sortable: true },
         { id: 'locations', label: 'Locations', sortable: false },
+        { id: 'city', label: 'City', sortable: false },
         { id: 'sources', label: 'Sources', sortable: false }
     ];
     
@@ -2346,6 +2444,20 @@ function populateDoctorsTable(doctorsData) {
     
     // Create the table body
     const tbody = document.createElement('tbody');
+    
+    // Add no results message if needed
+    if (!doctorsData || doctorsData.length === 0) {
+        const noResultsRow = document.createElement('tr');
+        noResultsRow.innerHTML = `
+            <td colspan="${columns.length}" class="no-results">
+                <div class="cell-content">No doctors found matching your criteria.</div>
+            </td>
+        `;
+        tbody.appendChild(noResultsRow);
+        table.appendChild(tbody);
+        tableContainer.appendChild(table);
+        return;
+    }
     
     // Populate with doctor data
     doctorsData.forEach(doctor => {
@@ -2416,7 +2528,7 @@ function populateDoctorsTable(doctorsData) {
             const otherCount = doctor.locations.length - 1;
             
             if (otherCount > 0) {
-                locationCount.innerHTML = `${mainLocation} <span class="more-count">+${otherCount} more</span>`;
+                locationCount.innerHTML = `${escapeHtml(mainLocation)} <span class="more-count">+${otherCount} more</span>`;
             } else {
                 locationCount.textContent = mainLocation;
             }
@@ -2452,6 +2564,17 @@ function populateDoctorsTable(doctorsData) {
         locationsCell.appendChild(locationsContent);
         row.appendChild(locationsCell);
         
+        // City cell
+        const cityCell = document.createElement('td');
+        cityCell.className = 'doctor-city-cell';
+        
+        const cityContent = document.createElement('div');
+        cityContent.className = 'cell-content';
+        cityContent.textContent = doctor.city || '-';
+        
+        cityCell.appendChild(cityContent);
+        row.appendChild(cityCell);
+        
         // Sources cell
         const sourcesCell = document.createElement('td');
         sourcesCell.className = 'doctor-sources-cell';
@@ -2459,11 +2582,11 @@ function populateDoctorsTable(doctorsData) {
         const sourcesContent = document.createElement('div');
         sourcesContent.className = 'cell-content';
         
-        if (doctor.sources && doctor.sources.length > 0) {
+        if (doctor.contributing_sources && doctor.contributing_sources.length > 0) {
             const sourceList = document.createElement('div');
             sourceList.className = 'source-list';
             
-            doctor.sources.forEach(source => {
+            doctor.contributing_sources.forEach(source => {
                 const sourceItem = document.createElement('div');
                 sourceItem.className = 'source-item';
                 sourceItem.textContent = source;
@@ -2487,6 +2610,11 @@ function populateDoctorsTable(doctorsData) {
     
     table.appendChild(tbody);
     tableContainer.appendChild(table);
+    
+    // Add table interactions after a short delay
+    setTimeout(() => {
+        addTableInteractions();
+    }, 100);
 }
 
 // Add sorting functionality to the table headers
@@ -2554,10 +2682,23 @@ function setupTableSorting() {
 
 // Show an alert message to the user
 function showAlert(type, message) {
-    const alertContainer = document.getElementById('alert-container');
+    let alertContainer = document.getElementById('alert-container');
+    
+    // If alert container doesn't exist, create it
     if (!alertContainer) {
-        console.error('Alert container not found!');
-        return;
+        console.log('Alert container not found, creating it dynamically');
+        alertContainer = document.createElement('div');
+        alertContainer.id = 'alert-container';
+        alertContainer.className = 'alert-container';
+        
+        // Add it at the top of the app container
+        const appContainer = document.querySelector('.app-container');
+        if (appContainer) {
+            appContainer.prepend(alertContainer);
+        } else {
+            // If no app container, add it to the body
+            document.body.prepend(alertContainer);
+        }
     }
     
     // Clear any existing alerts
@@ -2589,8 +2730,96 @@ function clearAlert() {
     }
 }
 
+// Add CSS for alert container dynamically
+function addAlertStyles() {
+    // Check if alert styles already exist
+    if (document.getElementById('alert-styles')) {
+        return;
+    }
+    
+    // Create style element
+    const style = document.createElement('style');
+    style.id = 'alert-styles';
+    style.textContent = `
+        .alert-container {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 9999;
+            width: 80%;
+            max-width: 600px;
+        }
+        
+        .alert {
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+            position: relative;
+            animation: alert-fade-in 0.3s ease;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .alert-success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .alert-error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .alert-warning {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeeba;
+        }
+        
+        .alert-info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        
+        .alert-close {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: transparent;
+            border: none;
+            font-size: 16px;
+            cursor: pointer;
+            opacity: 0.6;
+        }
+        
+        .alert-close:hover {
+            opacity: 1;
+        }
+        
+        @keyframes alert-fade-in {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    `;
+    
+    // Add to head
+    document.head.appendChild(style);
+}
+
 // Initialize the application
 function init() {
+    // Add alert styles
+    addAlertStyles();
+    
     // Set up tab switching
     setupTabs();
     
@@ -2615,4 +2844,16 @@ document.addEventListener('DOMContentLoaded', init);
 // Call init in case the DOM is already loaded
 if (document.readyState === 'complete' || document.readyState === 'interactive') {
     init();
+}
+
+// Helper function to escape HTML
+function escapeHtml(unsafe) {
+    if (!unsafe) return '';
+    return unsafe
+        .toString()
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
 }
