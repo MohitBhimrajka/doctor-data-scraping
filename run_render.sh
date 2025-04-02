@@ -1,6 +1,15 @@
 #!/bin/bash
 set -e  # Exit immediately if a command exits with a non-zero status
 
+export NODE_ENV=production
+
+# Install dependencies
+echo "Installing Python dependencies..."
+pip install -r requirements.txt
+
+echo "Installing Node.js dependencies..."
+cd frontend && npm install && cd ..
+
 echo "Starting deployment..."
 
 # Log environment for debugging
@@ -12,22 +21,22 @@ echo "PYTHON_VERSION: $PYTHON_VERSION"
 export PORT=${PORT:-3000}
 echo "Using PORT: $PORT"
 
-# Start the backend server in the background
+# Start Python backend server
 echo "Starting Python backend server..."
 python server.py &
 BACKEND_PID=$!
 
 # Wait for backend to initialize
 echo "Waiting for backend to initialize..."
-sleep 10
+sleep 5
 
 # Set BACKEND_API_URL if not already set
 export BACKEND_API_URL=${BACKEND_API_URL:-"http://localhost:8000"}
 echo "Using BACKEND_API_URL: $BACKEND_API_URL"
 
-# Start the frontend server
+# Start Node.js frontend server 
 echo "Starting Node.js frontend server..."
-cd frontend && node server.js &
+cd frontend && NODE_ENV=production PORT=3000 node server.js &
 FRONTEND_PID=$!
 
 echo "Both servers started. Backend PID: $BACKEND_PID, Frontend PID: $FRONTEND_PID"
@@ -44,3 +53,6 @@ trap cleanup SIGINT SIGTERM EXIT
 
 # Wait for both processes
 wait $BACKEND_PID $FRONTEND_PID 
+
+# Keep the container running
+wait 

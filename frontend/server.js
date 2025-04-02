@@ -8,7 +8,16 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const BACKEND_API_URL = process.env.BACKEND_API_URL || 'http://localhost:8000';
+
+// In production (Render), backend may be accessible through API calls directly
+// In development, use localhost with the specified port
+const isProduction = process.env.NODE_ENV === 'production';
+const BACKEND_API_URL = isProduction 
+    ? process.env.BACKEND_API_URL || '/api' // Use relative path in production
+    : process.env.BACKEND_API_URL || 'http://localhost:8000';
+
+console.log(`Using BACKEND_API_URL: ${BACKEND_API_URL}`);
+console.log(`Environment: ${isProduction ? 'Production' : 'Development'}`);
 
 // Serve static files from public directory
 app.use(express.static(path.join(__dirname, 'public')));
@@ -18,7 +27,7 @@ app.use('/assets', express.static(path.join(__dirname, 'assets')));
 
 // Proxy API requests to the backend
 app.use('/api', createProxyMiddleware({
-    target: BACKEND_API_URL,
+    target: isProduction ? 'http://127.0.0.1:8000' : BACKEND_API_URL,
     changeOrigin: true,
     pathRewrite: function(path) {
         // If BACKEND_API_URL already includes /api, don't duplicate it
@@ -30,10 +39,14 @@ app.use('/api', createProxyMiddleware({
     },
     onError: (err, req, res) => {
         console.error('Proxy error:', err);
-        res.status(500).json({
-            error: 'Proxy Error',
-            message: 'Failed to communicate with the backend service'
+        res.writeHead(500, {
+            'Content-Type': 'application/json'
         });
+        res.end(JSON.stringify({
+            error: 'Proxy Error',
+            message: 'Failed to communicate with the backend service',
+            details: err.message
+        }));
     },
     logLevel: 'debug'
 }));
@@ -46,5 +59,5 @@ app.get('*', (req, res) => {
 // Start the server
 app.listen(PORT, () => {
     console.log(`Frontend server running on http://localhost:${PORT}`);
-    console.log(`Proxying API requests to ${BACKEND_API_URL}`);
+    console.log(`Proxying API requests to ${isProduction ? 'http://127.0.0.1:8000' : BACKEND_API_URL}`);
 }); 
