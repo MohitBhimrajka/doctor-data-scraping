@@ -52,4 +52,23 @@ doctors.db
 Thumbs.db
 
 # Application specific
-streamlit-frontend/streamlit_app.log 
+streamlit-frontend/streamlit_app.log
+
+# Node.js
+node_modules/
+**/node_modules/
+**/node_modules 2/
+npm-debug.log
+yarn-debug.log
+yarn-error.log
+.pnpm-debug.log
+.npm
+.yarn
+.pnp*
+package-lock.json
+yarn.lock
+
+# Frontend build files
+frontend/build/
+frontend/dist/
+**/.cache/ 
