@@ -116,6 +116,22 @@ async def read_root():
         "timestamp": datetime.now().isoformat()
     }
 
+@app.head("/")
+async def head_root():
+    # Head method for health checks
+    return {"status": "ok"}
+
+@app.get("/health")
+@app.head("/health")
+async def health_check():
+    return {"status": "ok", "timestamp": datetime.now().isoformat()}
+
+@app.head("/api/search")
+@app.get("/api/search/health")
+async def search_health_check():
+    # For Render health checks
+    return {"status": "ok", "timestamp": datetime.now().isoformat()}
+
 @app.post("/api/search")
 async def search_doctors(request: SearchRequest):
     try:
@@ -440,13 +456,6 @@ async def search_doctors_by_custom_cities(request: CustomCitiesSearchRequest):
                 }
             }
         )
-
-@app.get("/health")
-async def health_check():
-    return {
-        "status": "healthy",
-        "timestamp": datetime.now().isoformat()
-    }
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):

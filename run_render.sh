@@ -9,7 +9,7 @@ echo "PORT: $PORT"
 echo "PYTHON_VERSION: $PYTHON_VERSION"
 
 # Set default PORT if not provided by environment
-export PORT=${PORT:-8000}
+export PORT=${PORT:-3000}
 echo "Using PORT: $PORT"
 
 # Start the backend server in the background

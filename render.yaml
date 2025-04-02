@@ -17,11 +17,12 @@ services:
           type: web
           property: url
       - key: PORT
-        value: 8000
+        value: 3000
       - key: NODE_VERSION
         value: 18
       - key: PYTHON_VERSION
         value: 3.11.7
-    healthCheckPath: /
+    healthCheckPath: /api/search
+    healthCheckTimeout: 60
     autoDeploy: true
     plan: starter 
