@@ -21,7 +21,7 @@ services:
       - key: NODE_VERSION
         value: 18
       - key: PYTHON_VERSION
-        value: 3.11
+        value: 3.11.7
     healthCheckPath: /
     autoDeploy: true
     plan: starter 
