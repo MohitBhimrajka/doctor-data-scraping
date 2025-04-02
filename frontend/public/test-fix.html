@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Doctor Search Test Fix</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background-color: #f9f9f9;
+        }
+        .test-title {
+            font-weight: 600;
+            font-size: 18px;
+            margin-bottom: 15px;
+        }
+        .test-controls {
+            margin: 15px 0;
+        }
+        button {
+            padding: 8px 16px;
+            background-color: #1976D2;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: inherit;
+            margin-right: 10px;
+        }
+        button:hover {
+            background-color: #1565C0;
+        }
+        pre {
+            background-color: #f0f0f0;
+            padding: 10px;
+            border-radius: 4px;
+            overflow: auto;
+            max-height: 200px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Loading Container -->
+    <div class="loading-container" style="display: none;">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">Searching for doctors...</div>
+        <div id="search-progress-container" class="progress-container">
+            <div id="search-progress-bar" class="progress-bar"></div>
+        </div>
+        <div id="search-progress-text" class="progress-text">Initializing search...</div>
+    </div>
+
+    <h1>Doctor Search Test Fix</h1>
+    
+    <div class="test-section">
+        <div class="test-title">Test Expanders</div>
+        <div class="expander">
+            <div class="expander-header">
+                <span>Expander Test</span>
+            </div>
+            <div class="expander-content">
+                <p>This is the expander content that should be hidden until clicked.</p>
+                <ul>
+                    <li>Test Item 1</li>
+                    <li>Test Item 2</li>
+                    <li>Test Item 3</li>
+                </ul>
+            </div>
+        </div>
+        <div class="test-controls">
+            <button id="setup-expanders">Setup Expanders</button>
+        </div>
+    </div>
+    
+    <div class="test-section">
+        <div class="test-title">Test Results Display</div>
+        <div id="results-section" class="results-section">
+            <div id="search-summary" class="search-summary">
+                <h2>Search Results: <span id="search-title">Doctors</span></h2>
+                <div class="summary-pills">
+                    <div class="pill pill-count" style="display: flex;">
+                        <i class="material-icons">people</i>
+                        <span><span id="result-count">0</span> doctors</span>
+                    </div>
+                    <div class="pill pill-location" style="display: flex;">
+                        <i class="material-icons">place</i>
+                        <span id="search-location">-</span>
+                    </div>
+                    <div class="pill pill-specialization" style="display: flex;">
+                        <i class="material-icons">local_hospital</i>
+                        <span id="search-specialization">-</span>
+                    </div>
+                    <div class="pill pill-time" style="display: flex;">
+                        <i class="material-icons">timer</i>
+                        <span id="search-time">-</span>
+                    </div>
+                </div>
+            </div>
+            <div class="search-metadata">
+                <div class="metadata-item">
+                    <i class="material-icons">people</i> 
+                    Found <strong id="search-count">0</strong> doctors
+                </div>
+                <div class="metadata-item">
+                    <i class="material-icons">place</i> 
+                    In <strong id="search-location-metadata">-</strong>
+                </div>
+                <div class="metadata-item">
+                    <i class="material-icons">local_hospital</i> 
+                    Specialization: <strong id="search-specialization-metadata">-</strong>
+                </div>
+            </div>
+            <div class="doctors-table-container">
+                <table id="doctors-table" class="doctors-table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Rating</th>
+                            <th>Reviews</th>
+                            <th>Locations</th>
+                            <th>City</th>
+                            <th>Sources</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Test data will be inserted here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="test-controls">
+            <button id="show-results">Show Results</button>
+            <button id="update-count">Update Doctor Count (10)</button>
+            <button id="update-count-zero">Update Doctor Count (0)</button>
+        </div>
+    </div>
+    
+    <div class="test-section">
+        <div class="test-title">Test Loading UI</div>
+        <div class="test-controls">
+            <button id="show-loading">Show Loading</button>
+            <button id="hide-loading">Hide Loading</button>
+        </div>
+    </div>
+
+    <script>
+        // Set up global variables
+        window.showNotification = function(message, type) {
+            console.log(`NOTIFICATION (${type}): ${message}`);
+            alert(`${type.toUpperCase()}: ${message}`);
+        };
+        
+        // Test functions
+        function setupExpanders() {
+            console.log('Setting up expanders...');
+            
+            // First remove any existing event handlers by cloning and replacing
+            document.querySelectorAll('.expander-header').forEach(header => {
+                const oldHeader = header.cloneNode(true);
+                header.parentNode.replaceChild(oldHeader, header);
+            });
+            
+            // Find all expander headers
+            const expanders = document.querySelectorAll('.expander-header');
+            console.log(`Found ${expanders.length} expander headers`);
+            
+            expanders.forEach(header => {
+                console.log('Adding click event to expander:', header);
+                
+                // Remove inline onclick handlers if they exist
+                if (header.hasAttribute('onclick')) {
+                    header.removeAttribute('onclick');
+                }
+                
+                header.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    // Find the parent expander element
+                    const parent = this.closest('.expander');
+                    if (!parent) {
+                        console.error('Could not find parent expander element');
+                        return;
+                    }
+                    
+                    console.log('Toggling active class on', parent);
+                    parent.classList.toggle('active');
+                    
+                    // Log state for debugging
+                    console.log(`Expander is now ${parent.classList.contains('active') ? 'open' : 'closed'}`);
+                    
+                    // Handle content visibility
+                    const content = parent.querySelector('.expander-content');
+                    if (!content) {
+                        console.error('Could not find content element');
+                        return;
+                    }
+                    
+                    if (parent.classList.contains('active')) {
+                        // Show content
+                        content.style.display = 'block';
+                        // Allow browser to calculate scrollHeight after display is set
+                        setTimeout(() => {
+                            content.style.maxHeight = content.scrollHeight + 'px';
+                        }, 10);
+                    } else {
+                        // Hide content (start transition)
+                        content.style.maxHeight = '0px';
+                        // Wait for transition to complete before hiding
+                        setTimeout(() => {
+                            if (!parent.classList.contains('active')) {
+                                content.style.display = 'none';
+                            }
+                        }, 300);
+                    }
+                });
+            });
+            
+            // Initialize expander states
+            document.querySelectorAll('.expander').forEach(expander => {
+                // Make sure expander is visible
+                expander.style.display = 'block';
+                
+                const content = expander.querySelector('.expander-content');
+                if (!content) return;
+                
+                // Initially set up content based on active state
+                if (expander.classList.contains('active')) {
+                    content.style.display = 'block';
+                    content.style.maxHeight = content.scrollHeight + 'px';
+                } else {
+                    content.style.display = 'none';
+                    content.style.maxHeight = '0px';
+                }
+            });
+        }
+
+        function showLoading() {
+            console.log('Showing loading overlay...');
+            
+            // Show loading overlay
+            let loadingContainer = document.querySelector('.loading-container');
+            
+            // Create loading container if it doesn't exist
+            if (!loadingContainer) {
+                console.log('Creating loading container...');
+                loadingContainer = document.createElement('div');
+                loadingContainer.className = 'loading-container';
+                document.body.appendChild(loadingContainer);
+            }
+            
+            // Add content to loading container
+            loadingContainer.innerHTML = `
+                <div class="loading-spinner"></div>
+                <div class="loading-text">Searching for doctors...</div>
+                <div id="search-progress-container" class="progress-container">
+                    <div id="search-progress-bar" class="progress-bar"></div>
+                </div>
+                <div id="search-progress-text" class="progress-text">Initializing search...</div>
+            `;
+            
+            // Make sure the container is visible
+            loadingContainer.style.display = 'flex';
+            loadingContainer.style.opacity = '1';
+            loadingContainer.style.zIndex = '9999';
+        }
+
+        function hideLoading() {
+            console.log('Hiding loading overlay...');
+            
+            const loadingContainer = document.querySelector('.loading-container');
+            if (loadingContainer) {
+                loadingContainer.style.opacity = '0';
+                
+                // After fade out, set display to none
+                setTimeout(() => {
+                    loadingContainer.style.display = 'none';
+                }, 300);
+            }
+        }
+
+        function updateSearchSummary(count) {
+            // Update the search summary elements
+            document.getElementById('search-title').textContent = 'Test Doctors';
+            
+            // Update both count elements (pill and metadata)
+            updateCount(count);
+            
+            document.getElementById('search-location').textContent = 'Test Location';
+            document.getElementById('search-location-metadata').textContent = 'Test Location';
+            
+            document.getElementById('search-specialization').textContent = 'Test Specialty';
+            document.getElementById('search-specialization-metadata').textContent = 'Test Specialty';
+            
+            document.getElementById('search-time').textContent = '1.5 seconds';
+            
+            // Make the results section visible
+            const resultsSection = document.getElementById('results-section');
+            resultsSection.style.display = 'block';
+            resultsSection.classList.add('visible');
+            resultsSection.style.opacity = '1';
+        }
+        
+        function updateCount(count) {
+            // Update count elements with animation
+            const updateCountAnimation = () => {
+                // Update result-count in the pill
+                const resultCountElement = document.getElementById('result-count');
+                if (resultCountElement) {
+                    const currentCount = parseInt(resultCountElement.textContent) || 0;
+                    const increment = Math.ceil((count - currentCount) / 10);
+                    
+                    if (currentCount < count) {
+                        resultCountElement.textContent = Math.min(currentCount + increment, count);
+                        setTimeout(updateCountAnimation, 50);
+                    } else if (currentCount > count) {
+                        resultCountElement.textContent = Math.max(currentCount - increment, count);
+                        setTimeout(updateCountAnimation, 50);
+                    }
+                }
+                
+                // Also update search-count in the header
+                const searchCountElement = document.getElementById('search-count');
+                if (searchCountElement) {
+                    searchCountElement.textContent = count;
+                }
+            };
+            
+            // Start the count animation
+            updateCountAnimation();
+        }
+        
+        // Set up event listeners
+        document.addEventListener('DOMContentLoaded', function() {
+            // Expander test
+            document.getElementById('setup-expanders').addEventListener('click', setupExpanders);
+            
+            // Results display test
+            document.getElementById('show-results').addEventListener('click', function() {
+                updateSearchSummary(5);
+            });
+            
+            document.getElementById('update-count').addEventListener('click', function() {
+                updateCount(10);
+            });
+            
+            document.getElementById('update-count-zero').addEventListener('click', function() {
+                updateCount(0);
+            });
+            
+            // Loading UI test
+            document.getElementById('show-loading').addEventListener('click', showLoading);
+            document.getElementById('hide-loading').addEventListener('click', hideLoading);
+            
+            // Initialize expanders
+            setupExpanders();
+        });
+    </script>
+</body>
+</html> 

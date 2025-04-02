@@ -3,212 +3,318 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>API Test</title>
+    <title>Doctor Search Test</title>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link href="styles.css" rel="stylesheet">
     <style>
         body {
-            font-family: Arial, sans-serif;
-            max-width: 900px;
-            margin: 0 auto;
+            font-family: 'Poppins', sans-serif;
+            line-height: 1.6;
+            margin: 0;
             padding: 20px;
+            background-color: #f5f7fa;
         }
         .container {
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-        }
-        .card {
-            border: 1px solid #ccc;
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
             padding: 20px;
             border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #1976D2;
+            margin-top: 0;
+        }
+        .card {
+            background: #f8f9fa;
+            border-radius: 6px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 1px solid #e0e0e0;
+        }
+        h2 {
+            margin-top: 0;
+            color: #333;
+            font-size: 18px;
         }
         button {
-            padding: 10px 15px;
-            background-color: #4CAF50;
+            background: #1976D2;
             color: white;
             border: none;
+            padding: 10px 15px;
             border-radius: 4px;
             cursor: pointer;
-            margin-bottom: 10px;
+            font-weight: 500;
+            margin-top: 10px;
         }
         button:hover {
-            background-color: #45a049;
+            background: #1565C0;
         }
         pre {
-            background-color: #f5f5f5;
+            background: #f1f1f1;
             padding: 10px;
             border-radius: 4px;
             overflow-x: auto;
-            max-height: 300px;
-            font-size: 14px;
-        }
-        .result-info {
-            margin-top: 20px;
-            border-top: 1px solid #eee;
-            padding-top: 10px;
-        }
-        .status {
-            padding: 5px 10px;
-            border-radius: 4px;
-            display: inline-block;
-            margin-bottom: 10px;
-        }
-        .status-success {
-            background-color: #dff0d8;
-            color: #3c763d;
-        }
-        .status-error {
-            background-color: #f2dede;
-            color: #a94442;
-        }
-        .status-loading {
-            background-color: #d9edf7;
-            color: #31708f;
+            margin-top: 15px;
         }
     </style>
 </head>
 <body>
-    <h1>API Test Page</h1>
-    
     <div class="container">
+        <h1>Doctor Search Test Page</h1>
+        
         <div class="card">
-            <h2>Single City Search</h2>
-            <button onclick="testSingleCitySearch()">Test Single City Search</button>
-            <div id="single-city-result"></div>
+            <h2>Tier Search Test</h2>
+            <p>Tests the tier search functionality for Cardiologists in Tier 1 cities.</p>
+            <button id="test-tier">Test Tier Search</button>
+            <pre id="tier-result">Results will appear here...</pre>
         </div>
         
         <div class="card">
-            <h2>Tier-wise Search</h2>
-            <button onclick="testTierSearch()">Test Tier Search</button>
-            <div id="tier-result"></div>
-        </div>
-        
-        <div class="card">
-            <h2>Custom Cities Search</h2>
-            <button onclick="testCustomSearch()">Test Custom Cities Search</button>
-            <div id="custom-result"></div>
+            <h2>Custom Cities Search Test</h2>
+            <p>Tests the custom cities search functionality for Cardiologists in Mumbai and Delhi.</p>
+            <button id="test-custom">Test Custom Cities Search</button>
+            <pre id="custom-result">Results will appear here...</pre>
         </div>
     </div>
 
-    <script>
-        const BACKEND_API_URL = '';
-        
-        // Test Single City Search
-        async function testSingleCitySearch() {
-            const resultDiv = document.getElementById('single-city-result');
-            resultDiv.innerHTML = '<div class="status status-loading">Loading...</div>';
-            
-            try {
-                const response = await fetch(`${BACKEND_API_URL}/api/search`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        city: 'Mumbai',
-                        specialization: 'Cardiologist'
-                    })
-                });
-                
-                const data = await response.json();
-                
-                // Display result
-                const statusClass = response.ok ? 'status-success' : 'status-error';
-                const statusText = response.ok ? 'Success' : 'Failed';
-                
-                resultDiv.innerHTML = `
-                    <div class="status ${statusClass}">Status: ${response.status} ${statusText}</div>
-                    <div class="result-info">
-                        <p><strong>Doctors found:</strong> ${data.data ? data.data.length : 0}</p>
-                        <p><strong>Search duration:</strong> ${data.metadata?.search_duration?.toFixed(2) || 'N/A'} seconds</p>
-                    </div>
-                    <details>
-                        <summary>View response data</summary>
-                        <pre>${JSON.stringify(data, null, 2).substring(0, 1000)}...</pre>
-                    </details>
-                `;
-            } catch (error) {
-                resultDiv.innerHTML = `<div class="status status-error">Error: ${error.message}</div>`;
-            }
-        }
+    <!-- Loading Container -->
+    <div class="loading-container" style="display: none;">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">Searching doctors...</div>
+    </div>
 
-        // Test Tier-wise Search
+    <!-- Alert Container -->
+    <div id="alert-container" class="alert-container"></div>
+    
+    <!-- Results Section -->
+    <div id="results-section" class="results-section" style="display: none;">
+        <div id="search-summary" class="search-summary">
+            <h2>Search Results: <span id="search-title">Doctors</span></h2>
+            <div class="summary-details">
+                <div class="summary-item">
+                    <strong>Found:</strong> <span id="result-count">0</span> doctors
+                </div>
+                <div class="summary-item">
+                    <strong>Location:</strong> <span id="search-location">-</span>
+                </div>
+                <div class="summary-item">
+                    <strong>Specialization:</strong> <span id="search-specialization">-</span>
+                </div>
+            </div>
+        </div>
+        <div class="doctors-table-container"></div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.0/xlsx.full.min.js"></script>
+    <script>
+        // Define necessary globals
+        const BACKEND_API_URL = '/api';
+
+        // Test functions
         async function testTierSearch() {
-            const resultDiv = document.getElementById('tier-result');
-            resultDiv.innerHTML = '<div class="status status-loading">Loading...</div>';
+            document.getElementById('tier-result').textContent = 'Loading...';
             
             try {
-                const response = await fetch(`${BACKEND_API_URL}/api/search/tier`, {
+                const loadingContainer = document.querySelector('.loading-container');
+                if (loadingContainer) loadingContainer.style.display = 'flex';
+
+                const response = await fetch('/api/search/tier', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         tier: 'tier1',
                         specialization: 'Cardiologist'
                     })
                 });
-                
+
+                if (loadingContainer) loadingContainer.style.display = 'none';
+
+                if (!response.ok) {
+                    throw new Error(`API error: ${response.status} ${response.statusText}`);
+                }
+
                 const data = await response.json();
+                document.getElementById('tier-result').textContent = 
+                    `Success: ${data.success}\nResults: ${data.data ? data.data.length : 0} doctors`;
                 
-                // Display result
-                const statusClass = response.ok ? 'status-success' : 'status-error';
-                const statusText = response.ok ? 'Success' : 'Failed';
-                
-                resultDiv.innerHTML = `
-                    <div class="status ${statusClass}">Status: ${response.status} ${statusText}</div>
-                    <div class="result-info">
-                        <p><strong>Doctors found:</strong> ${data.data ? data.data.length : 0}</p>
-                        <p><strong>Search duration:</strong> ${data.metadata?.search_duration?.toFixed(2) || 'N/A'} seconds</p>
-                    </div>
-                    <details>
-                        <summary>View response data</summary>
-                        <pre>${JSON.stringify(data, null, 2).substring(0, 1000)}...</pre>
-                    </details>
-                `;
+                if (data.success && data.data && data.data.length > 0) {
+                    // Display the results
+                    displayResults(data.data, 'tier', {
+                        tier: 'tier1',
+                        specialization: 'Cardiologist'
+                    });
+                }
             } catch (error) {
-                resultDiv.innerHTML = `<div class="status status-error">Error: ${error.message}</div>`;
+                console.error('Error in tier search test:', error);
+                document.getElementById('tier-result').textContent = `Error: ${error.message}`;
+                
+                const loadingContainer = document.querySelector('.loading-container');
+                if (loadingContainer) loadingContainer.style.display = 'none';
             }
         }
-        
-        // Test Custom Cities Search
+
         async function testCustomSearch() {
-            const resultDiv = document.getElementById('custom-result');
-            resultDiv.innerHTML = '<div class="status status-loading">Loading...</div>';
+            document.getElementById('custom-result').textContent = 'Loading...';
             
             try {
-                const response = await fetch(`${BACKEND_API_URL}/api/search/custom`, {
+                const loadingContainer = document.querySelector('.loading-container');
+                if (loadingContainer) loadingContainer.style.display = 'flex';
+
+                const response = await fetch('/api/search/custom', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         cities: ['Mumbai', 'Delhi'],
                         specialization: 'Cardiologist'
                     })
                 });
-                
+
+                if (loadingContainer) loadingContainer.style.display = 'none';
+
+                if (!response.ok) {
+                    throw new Error(`API error: ${response.status} ${response.statusText}`);
+                }
+
                 const data = await response.json();
+                document.getElementById('custom-result').textContent = 
+                    `Success: ${data.success}\nResults: ${data.data ? data.data.length : 0} doctors`;
                 
-                // Display result
-                const statusClass = response.ok ? 'status-success' : 'status-error';
-                const statusText = response.ok ? 'Success' : 'Failed';
-                
-                resultDiv.innerHTML = `
-                    <div class="status ${statusClass}">Status: ${response.status} ${statusText}</div>
-                    <div class="result-info">
-                        <p><strong>Doctors found:</strong> ${data.data ? data.data.length : 0}</p>
-                        <p><strong>Search duration:</strong> ${data.metadata?.search_duration?.toFixed(2) || 'N/A'} seconds</p>
-                    </div>
-                    <details>
-                        <summary>View response data</summary>
-                        <pre>${JSON.stringify(data, null, 2).substring(0, 1000)}...</pre>
-                    </details>
-                `;
+                if (data.success && data.data && data.data.length > 0) {
+                    // Display the results
+                    displayResults(data.data, 'custom', {
+                        cities: ['Mumbai', 'Delhi'],
+                        specialization: 'Cardiologist'
+                    });
+                }
             } catch (error) {
-                resultDiv.innerHTML = `<div class="status status-error">Error: ${error.message}</div>`;
+                console.error('Error in custom search test:', error);
+                document.getElementById('custom-result').textContent = `Error: ${error.message}`;
+                
+                const loadingContainer = document.querySelector('.loading-container');
+                if (loadingContainer) loadingContainer.style.display = 'none';
             }
         }
+
+        // Display search results
+        function displayResults(data, searchType, searchParams) {
+            // Get the results section
+            const resultsSection = document.getElementById('results-section');
+            if (!resultsSection) return;
+            
+            // Clear any existing content
+            const tableContainer = resultsSection.querySelector('.doctors-table-container');
+            if (tableContainer) tableContainer.innerHTML = '';
+            
+            // Update search summary
+            const searchTitle = document.getElementById('search-title');
+            const resultCount = document.getElementById('result-count');
+            const searchLocation = document.getElementById('search-location');
+            const searchSpecialization = document.getElementById('search-specialization');
+            
+            if (searchTitle) {
+                if (searchType === 'tier') {
+                    searchTitle.textContent = `${searchParams.specialization} in Tier ${searchParams.tier.slice(-1)} Cities`;
+                } else if (searchType === 'custom') {
+                    searchTitle.textContent = `${searchParams.specialization} in Selected Cities`;
+                }
+            }
+            
+            if (resultCount) resultCount.textContent = data.length;
+            
+            if (searchLocation) {
+                if (searchType === 'tier') {
+                    searchLocation.textContent = `Tier ${searchParams.tier.slice(-1)} Cities`;
+                } else if (searchType === 'custom') {
+                    searchLocation.textContent = searchParams.cities.join(', ');
+                }
+            }
+            
+            if (searchSpecialization) searchSpecialization.textContent = searchParams.specialization;
+            
+            // Create table
+            const table = document.createElement('table');
+            table.className = 'doctors-table';
+            
+            // Create table header
+            const thead = document.createElement('thead');
+            const headerRow = document.createElement('tr');
+            
+            ['Name', 'Rating', 'Reviews', 'Locations', 'City', 'Sources'].forEach(header => {
+                const th = document.createElement('th');
+                th.textContent = header;
+                headerRow.appendChild(th);
+            });
+            
+            thead.appendChild(headerRow);
+            table.appendChild(thead);
+            
+            // Create table body
+            const tbody = document.createElement('tbody');
+            
+            data.forEach(doctor => {
+                const row = document.createElement('tr');
+                
+                // Name cell
+                const nameCell = document.createElement('td');
+                nameCell.textContent = doctor.name || 'Unknown';
+                row.appendChild(nameCell);
+                
+                // Rating cell
+                const ratingCell = document.createElement('td');
+                ratingCell.textContent = doctor.rating || 'N/A';
+                row.appendChild(ratingCell);
+                
+                // Reviews cell
+                const reviewsCell = document.createElement('td');
+                reviewsCell.textContent = doctor.reviews || 'N/A';
+                row.appendChild(reviewsCell);
+                
+                // Locations cell
+                const locationsCell = document.createElement('td');
+                if (doctor.locations && doctor.locations.length > 0) {
+                    locationsCell.textContent = doctor.locations[0];
+                    if (doctor.locations.length > 1) {
+                        locationsCell.textContent += ` (+${doctor.locations.length - 1} more)`;
+                    }
+                } else {
+                    locationsCell.textContent = 'N/A';
+                }
+                row.appendChild(locationsCell);
+                
+                // City cell
+                const cityCell = document.createElement('td');
+                cityCell.textContent = doctor.city || 'N/A';
+                row.appendChild(cityCell);
+                
+                // Sources cell
+                const sourcesCell = document.createElement('td');
+                if (doctor.sources && doctor.sources.length > 0) {
+                    sourcesCell.textContent = doctor.sources.join(', ');
+                } else {
+                    sourcesCell.textContent = 'N/A';
+                }
+                row.appendChild(sourcesCell);
+                
+                tbody.appendChild(row);
+            });
+            
+            table.appendChild(tbody);
+            tableContainer.appendChild(table);
+            
+            // Show results section
+            resultsSection.style.display = 'block';
+            resultsSection.classList.add('visible');
+            resultsSection.style.opacity = '1';
+            
+            // Scroll to results
+            resultsSection.scrollIntoView({ behavior: 'smooth' });
+        }
+        
+        // Add event listeners to buttons
+        document.getElementById('test-tier').addEventListener('click', testTierSearch);
+        document.getElementById('test-custom').addEventListener('click', testCustomSearch);
     </script>
 </body>
 </html> 

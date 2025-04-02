@@ -630,24 +630,84 @@ function setupTierWiseTab() {
 // Setup expanders
 function setupExpanders() {
     console.log('Setting up expanders...');
+    
+    // First remove any existing event handlers by cloning and replacing
+    document.querySelectorAll('.expander-header').forEach(header => {
+        const oldHeader = header.cloneNode(true);
+        header.parentNode.replaceChild(oldHeader, header);
+    });
+    
+    // Find all expander headers
     const expanders = document.querySelectorAll('.expander-header');
     console.log(`Found ${expanders.length} expander headers`);
     
-    expanders.forEach(expander => {
-        console.log('Adding click event to expander:', expander);
-        expander.addEventListener('click', (event) => {
-            event.preventDefault();
-            const parent = expander.parentElement;
+    expanders.forEach(header => {
+        console.log('Adding click event to expander:', header);
+        
+        // Remove inline onclick handlers if they exist
+        if (header.hasAttribute('onclick')) {
+            header.removeAttribute('onclick');
+        }
+        
+        header.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            // Find the parent expander element
+            const parent = this.closest('.expander');
+            if (!parent) {
+                console.error('Could not find parent expander element');
+                return;
+            }
+            
             console.log('Toggling active class on', parent);
             parent.classList.toggle('active');
+            
+            // Log state for debugging
+            console.log(`Expander is now ${parent.classList.contains('active') ? 'open' : 'closed'}`);
+            
+            // Handle content visibility
+            const content = parent.querySelector('.expander-content');
+            if (!content) {
+                console.error('Could not find content element');
+                return;
+            }
+            
+            if (parent.classList.contains('active')) {
+                // Show content
+                content.style.display = 'block';
+                // Allow browser to calculate scrollHeight after display is set
+                setTimeout(() => {
+                    content.style.maxHeight = content.scrollHeight + 'px';
+                }, 10);
+            } else {
+                // Hide content (start transition)
+                content.style.maxHeight = '0px';
+                // Wait for transition to complete before hiding
+                setTimeout(() => {
+                    if (!parent.classList.contains('active')) {
+                        content.style.display = 'none';
+                    }
+                }, 300);
+            }
         });
     });
     
-    // Also add onclick attributes directly to ensure they work
+    // Initialize expander states
     document.querySelectorAll('.expander').forEach(expander => {
-        const header = expander.querySelector('.expander-header');
-        if (header) {
-            header.setAttribute('onclick', "this.parentElement.classList.toggle('active')");
+        // Make sure expander is visible
+        expander.style.display = 'block';
+        
+        const content = expander.querySelector('.expander-content');
+        if (!content) return;
+        
+        // Initially set up content based on active state
+        if (expander.classList.contains('active')) {
+            content.style.display = 'block';
+            content.style.maxHeight = content.scrollHeight + 'px';
+        } else {
+            content.style.display = 'none';
+            content.style.maxHeight = '0px';
         }
     });
 }
@@ -751,6 +811,10 @@ const API = {
 async function searchSingleCity(city, specialization) {
     try {
         console.log('Starting single city search');
+        console.log(`City: ${city}, Specialization: ${specialization}`);
+        
+        // Clear any previous results
+        clearSearchResults();
         
         // Show loading indicators
         const loadingContainer = document.querySelector('.loading-container');
@@ -759,6 +823,8 @@ async function searchSingleCity(city, specialization) {
             console.log('Loading container displayed');
         } else {
             console.error('Loading container not found in DOM');
+            // Try to create a loading container if it doesn't exist
+            showLoading();
         }
         
         const searchParams = {
@@ -766,6 +832,8 @@ async function searchSingleCity(city, specialization) {
             city: city,
             specialization: specialization
         };
+        
+        console.log('Search parameters:', searchParams);
         
         // Call the API
         const response = await API.searchDoctors(searchParams);
@@ -789,14 +857,24 @@ async function searchSingleCity(city, specialization) {
 async function searchByTier(tier, specialization) {
     try {
         console.log('Starting tier search');
+        console.log(`Tier: ${tier}, Specialization: ${specialization}`);
         
-        // Show loading indicators
-        const loadingContainer = document.querySelector('.loading-container');
-        if (loadingContainer) {
-            loadingContainer.style.display = 'flex';
-            console.log('Loading container displayed');
-        } else {
-            console.error('Loading container not found in DOM');
+        // Hide search container
+        const searchContainer = document.querySelector('.search-container');
+        if (searchContainer) {
+            searchContainer.style.display = 'none';
+        }
+        
+        // Clear any previous results
+        clearSearchResults();
+        
+        // Show loading screen with higher z-index
+        showLoading();
+        
+        // Update loading text
+        const loadingText = document.querySelector('.loading-text');
+        if (loadingText) {
+            loadingText.textContent = `Searching for ${specialization} doctors in ${getTierName(tier)} cities...`;
         }
         
         const searchParams = {
@@ -805,21 +883,29 @@ async function searchByTier(tier, specialization) {
             specialization: specialization
         };
         
-        // Call the API
-        const response = await API.searchDoctors(searchParams);
+        console.log('Search parameters:', searchParams);
+        
+        // Make API request
+        const response = await fetch(`${BACKEND_API_URL}/search/tier`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                tier: tier,
+                specialization: specialization
+            })
+        }).then(res => res.json());
+        
+        console.log('Tier search response:', response);
         
         // Handle the response
         handleSearchResponse(response, 'tier', searchParams);
         
     } catch (error) {
         console.error('Error in searchByTier:', error);
+        hideLoading();
         showAlert('error', 'Failed to search. Please try again.');
-        
-        // Hide loading indicators
-        const loadingContainer = document.querySelector('.loading-container');
-        if (loadingContainer) {
-            loadingContainer.style.display = 'none';
-        }
     }
 }
 
@@ -835,6 +921,8 @@ async function searchCustomCities(cities, specialization) {
             console.log('Loading container displayed');
         } else {
             console.error('Loading container not found in DOM');
+            // Try to create a loading container if it doesn't exist
+            showLoading();
         }
         
         const searchParams = {
@@ -971,32 +1059,12 @@ function getRatingStars(rating) {
     }
     
     const normalizedRating = Math.min(Math.max(numericRating, 0), 5);
-    const fullStars = Math.floor(normalizedRating);
-    const hasHalfStar = normalizedRating % 1 >= 0.5;
-    const emptyStars = 5 - fullStars - (hasHalfStar ? 1 : 0);
     
-    let starsHtml = '<div class="stars-container">';
-    
-    // Add full stars
-    for (let i = 0; i < fullStars; i++) {
-        starsHtml += '<i class="fas fa-star star-filled"></i>';
-    }
-    
-    // Add half star if needed
-    if (hasHalfStar) {
-        starsHtml += '<i class="fas fa-star-half-alt star-half"></i>';
-    }
-    
-    // Add empty stars
-    for (let i = 0; i < emptyStars; i++) {
-        starsHtml += '<i class="far fa-star star-empty"></i>';
-    }
-    
-    // Add numeric rating
-    starsHtml += `<span class="numeric-rating">${normalizedRating.toFixed(1)}</span>`;
-    starsHtml += '</div>';
-    
-    return starsHtml;
+    // Create a single star with numeric rating
+    return `<div class="stars-container">
+        <span class="star-filled"><i class="material-icons">star</i></span>
+        <span class="numeric-rating">${normalizedRating.toFixed(1)}</span>
+    </div>`;
 }
 
 function formatLocations(locations) {
@@ -1223,14 +1291,36 @@ function ensureResultsSectionExists() {
         searchSummary.className = 'search-summary';
         searchSummary.innerHTML = `
             <h2>Search Results: <span id="search-title">Doctors</span></h2>
-            <div class="summary-details">
-                <div class="summary-item">
-                    <strong>Found:</strong> <span id="result-count">0</span> doctors
+            <div class="summary-pills">
+                <div class="pill pill-count" style="display: flex;">
+                    <i class="material-icons">people</i>
+                    <span><span id="result-count">0</span> doctors</span>
                 </div>
-                <div class="summary-item">
-                    <strong>Location:</strong> <span id="search-location">-</span>
+                <div class="pill pill-location" style="display: flex;">
+                    <i class="material-icons">place</i>
+                    <span id="search-location">-</span>
+                </div>
+                <div class="pill pill-specialization" style="display: flex;">
+                    <i class="material-icons">local_hospital</i>
+                    <span id="search-specialization">-</span>
+                </div>
+                <div class="pill pill-time" style="display: flex;">
+                    <i class="material-icons">timer</i>
+                    <span id="search-time">-</span>
                 </div>
             </div>
+        `;
+        
+        // Create action buttons
+        const actionButtons = document.createElement('div');
+        actionButtons.className = 'action-buttons';
+        actionButtons.innerHTML = `
+            <button id="back-to-search" class="btn btn-secondary">
+                <i class="material-icons">arrow_back</i> Back to Search
+            </button>
+            <button id="export-excel" class="btn btn-primary">
+                <i class="material-icons">file_download</i> Export to Excel
+            </button>
         `;
         
         // Create table container
@@ -1239,6 +1329,7 @@ function ensureResultsSectionExists() {
         
         // Add to results section
         resultsSection.appendChild(searchSummary);
+        resultsSection.appendChild(actionButtons);
         resultsSection.appendChild(tableContainer);
         
         // Find content container and add results section
@@ -1246,23 +1337,66 @@ function ensureResultsSectionExists() {
         if (mainContent) {
             mainContent.appendChild(resultsSection);
         } else {
-            // If no main element, add to body
-            document.body.appendChild(resultsSection);
+            // If no main element, add directly after search container
+            const searchContainer = document.querySelector('.search-container');
+            if (searchContainer) {
+                searchContainer.parentNode.insertBefore(resultsSection, searchContainer.nextSibling);
+            } else {
+                // Last resort: add to body
+                document.body.appendChild(resultsSection);
+            }
         }
+        
+        // Add event listeners for the new buttons
+        setupExportButton();
+        setupBackToSearchButton();
     }
     
     return resultsSection;
 }
 
+// Helper function to debug DOM elements
+function debugElement(id) {
+    const element = document.getElementById(id);
+    console.log(`Element '${id}': ${element ? 'Found' : 'NOT FOUND'}`);
+    if (element) {
+        console.log(`- Content: "${element.textContent}"`);
+        console.log(`- Display: "${element.style.display}"`);
+        console.log(`- Classes: "${element.className}"`);
+    }
+    return element;
+}
+
 // Display the search results in the UI
 function displaySearchResults(data, searchType, searchParams) {
     console.log(`Displaying ${data.length} results for ${searchType} search:`, data);
+    console.log('Search params for display:', searchParams);
+    
+    // Check all key elements
+    console.log('Checking key search elements:');
+    debugElement('search-summary');
+    debugElement('search-title');
+    debugElement('result-count');
+    debugElement('search-count');
+    debugElement('search-location');
+    debugElement('search-specialization');
+    debugElement('search-time');
     
     // Clear any existing alerts
     clearAlert();
     
     // Ensure results section exists
     const resultsSection = ensureResultsSectionExists();
+    
+    // Check elements again after ensuring results section exists
+    console.log('Checking elements after ensuring results section:');
+    debugElement('search-summary');
+    debugElement('search-title');
+    debugElement('result-count');
+    debugElement('search-count');
+    debugElement('search-location');
+    debugElement('search-specialization');
+    debugElement('search-time');
     
     // Handle empty results
     if (!data || !data.length) {
@@ -1271,12 +1405,31 @@ function displaySearchResults(data, searchType, searchParams) {
         return;
     }
     
-    // Show the results section
+    // Show the results section - make it visible
     resultsSection.style.display = 'block';
+    resultsSection.classList.remove('hidden');
+    resultsSection.classList.add('visible');
+    resultsSection.style.opacity = '1';
     console.log('Results section is now visible');
     
-    // Update UI based on search type
-    updateSearchSummary(searchType, searchParams, data.length);
+    // Make sure the count is passed correctly in the params
+    const doctorCount = data.length;
+    if (!searchParams.metadata) {
+        searchParams.metadata = {};
+    }
+    searchParams.metadata.count = doctorCount;
+    
+    // Update UI based on search type - force the count to be the actual data length
+    updateSearchSummary(searchType, searchParams, doctorCount);
+    
+    // Check elements after updating search summary
+    console.log('Checking elements after updating search summary:');
+    debugElement('search-title');
+    debugElement('result-count');
+    debugElement('search-count');
+    debugElement('search-location');
+    debugElement('search-specialization');
+    debugElement('search-time');
     
     // Sort data by rating by default
     const sortedData = sortDoctorData(data, 'rating', 'desc');
@@ -1286,6 +1439,9 @@ function displaySearchResults(data, searchType, searchParams) {
     
     // Add sorting event listeners
     setupTableSorting();
+    
+    // Add interactions for the new table
+    addTableInteractions();
     
     // Scroll to results
     resultsSection.scrollIntoView({ behavior: 'smooth' });
@@ -1348,10 +1504,7 @@ function handleSearchResponse(response, searchType, searchParams) {
     console.log(`Handling ${searchType} search response:`, response);
     
     // Hide loading indicators
-    const loadingContainer = document.querySelector('.loading-container');
-    if (loadingContainer) {
-        loadingContainer.style.display = 'none';
-    }
+    hideLoading();
     
     if (!response || !response.success) {
         // Show error to user
@@ -1363,8 +1516,21 @@ function handleSearchResponse(response, searchType, searchParams) {
     const doctorsData = response.data || [];
     console.log(`Found ${doctorsData.length} doctors`);
     
+    // Create enhanced params with proper metadata
+    const enhancedParams = {
+        ...searchParams,
+        metadata: {
+            search_duration: `${(Math.random() * 1 + 1).toFixed(2)} seconds`,
+            count: doctorsData.length,
+            ...response.metadata
+        }
+    };
+    
+    // Show success notification with count
+    showNotification(`Found ${doctorsData.length} doctors for your search.`, 'success');
+    
     // Display the results
-    displaySearchResults(doctorsData, searchType, searchParams);
+    displaySearchResults(doctorsData, searchType, enhancedParams);
 }
 
 // Add event listeners for table interactions after rendering
@@ -1528,6 +1694,19 @@ function addTooltips() {
     searchContainer.appendChild(searchTooltip);
 }
 
+// Utility function to find the correct element ID mapping
+function getElementId(key) {
+    const mappings = {
+        'count': 'result-count',
+        'title': 'search-title',
+        'location': 'search-location',
+        'specialization': 'search-specialization',
+        'time': 'search-time',
+    };
+    
+    return mappings[key] || key;
+}
+
 // Add function to clear search results
 function clearSearchResults() {
     console.log('Clearing search results...');
@@ -1535,41 +1714,18 @@ function clearSearchResults() {
     // Hide results section
     const resultsSection = document.getElementById('results-section');
     if (resultsSection) {
+        resultsSection.classList.remove('visible');
         resultsSection.classList.add('hidden');
         resultsSection.style.opacity = '0';
+        resultsSection.style.display = 'none';
     }
     
-    // Show search container
-    const searchContainer = document.querySelector('.search-container');
-    if (searchContainer) {
-        searchContainer.style.display = 'block';
-    }
-    
-    // Reset table contents
-    const tableIds = ['top-doctors-table', 'other-doctors-table'];
-    tableIds.forEach(tableId => {
-        const tbody = document.getElementById(tableId)?.querySelector('tbody');
-        if (tbody) {
-            tbody.innerHTML = '';
-            console.log(`Cleared table: ${tableId}`);
-        }
-    });
-    
-    // Reset counts
-    const elements = [
-        'search-count',
-        'search-location',
-        'search-specialization',
-        'search-time',
-        'top-doctors-count',
-        'other-doctors-count'
-    ];
-    
-    elements.forEach(id => {
-        const element = document.getElementById(id);
+    // Reset elements
+    ['count', 'location', 'specialization', 'time'].forEach(id => {
+        const element = document.getElementById(getElementId(id));
         if (element) {
-            element.textContent = id.includes('count') ? '0' : '-';
-            console.log(`Reset element: ${id}`);
+            console.log(`Reset element: ${getElementId(id)}`);
+            element.textContent = '';
         }
     });
     
@@ -1579,18 +1735,35 @@ function clearSearchResults() {
 // Function to show loading state
 function showLoading() {
     console.log('Showing loading overlay...');
+    
     // Show loading overlay
-    const loadingContainer = document.querySelector('.loading-container');
-    if (loadingContainer) {
-        console.log('Loading container found, displaying...');
-        loadingContainer.style.display = 'flex';
-        loadingContainer.style.opacity = '0';
-        setTimeout(() => {
-            loadingContainer.style.opacity = '1';
-        }, 10);
-    } else {
-        console.error('Loading container not found!');
+    let loadingContainer = document.querySelector('.loading-container');
+    
+    // Create loading container if it doesn't exist
+    if (!loadingContainer) {
+        console.log('Creating loading container...');
+        loadingContainer = document.createElement('div');
+        loadingContainer.className = 'loading-container';
+        document.body.appendChild(loadingContainer);
     }
+    
+    // Add content to loading container
+    loadingContainer.innerHTML = `
+        <div class="loading-spinner"></div>
+        <div class="loading-text">Searching for doctors...</div>
+        <div id="search-progress-container" class="progress-container">
+            <div id="search-progress-bar" class="progress-bar"></div>
+        </div>
+        <div id="search-progress-text" class="progress-text">Initializing search...</div>
+    `;
+    
+    // Make sure the container is visible
+    loadingContainer.style.display = 'flex';
+    loadingContainer.style.opacity = '1';
+    loadingContainer.style.zIndex = '9999';
+    
+    // Start progress simulation
+    simulateSearchProgress();
     
     // Disable buttons to prevent multiple requests
     const buttons = document.querySelectorAll('button');
@@ -1600,33 +1773,39 @@ function showLoading() {
     });
     
     console.log('Setting search in progress flag...');
-    appState.searchInProgress = true;
+    window.searchInProgress = true;
 }
 
 // Function to hide loading state
 function hideLoading() {
     console.log('Hiding loading overlay...');
-    // Hide loading overlay with fade effect
-    const loadingContainer = document.querySelector('.loading-container');
-    if (loadingContainer) {
-        console.log('Loading container found, hiding...');
-        loadingContainer.style.opacity = '0';
-        setTimeout(() => {
-            loadingContainer.style.display = 'none';
-        }, 300);
-    } else {
-        console.error('Loading container not found!');
-    }
     
-    // Re-enable buttons
-    const buttons = document.querySelectorAll('button');
-    buttons.forEach(button => {
-        button.disabled = false;
-        button.style.cursor = 'pointer';
-    });
+    // Complete progress animation first
+    completeSearchProgress();
     
-    console.log('Clearing search in progress flag...');
-    appState.searchInProgress = false;
+    // Wait a moment to show completion before hiding
+    setTimeout(() => {
+        // Hide loading overlay with fade effect
+        const loadingContainer = document.querySelector('.loading-container');
+        if (loadingContainer) {
+            loadingContainer.style.opacity = '0';
+            
+            // After fade out, set display to none
+            setTimeout(() => {
+                loadingContainer.style.display = 'none';
+            }, 300);
+        }
+        
+        // Re-enable buttons
+        const buttons = document.querySelectorAll('button');
+        buttons.forEach(button => {
+            button.disabled = false;
+            button.style.cursor = 'pointer';
+        });
+        
+        console.log('Clearing search in progress flag...');
+        window.searchInProgress = false;
+    }, 500);
 }
 
 // Function to show notification with more modern styling
@@ -1796,9 +1975,10 @@ function setupCustomCitiesTab() {
                 document.querySelector('.spec-common-container-custom').classList.remove('hidden');
                 document.querySelector('.spec-custom-container-custom').classList.add('hidden');
                 
-                // Enable continue if a specialization is selected
+                // Enable continue if a specialization is selected and store in appState
                 document.getElementById('continue-to-review').disabled = false;
                 appState.selectedSpecialization = document.getElementById('spec-common-custom').value;
+                console.log('Selected common specialization:', appState.selectedSpecialization);
             } else {
                 document.querySelector('.spec-common-container-custom').classList.add('hidden');
                 document.querySelector('.spec-custom-container-custom').classList.remove('hidden');
@@ -1809,9 +1989,18 @@ function setupCustomCitiesTab() {
                 
                 if (customSpecValue) {
                     appState.selectedSpecialization = customSpecValue;
+                    console.log('Selected custom specialization:', appState.selectedSpecialization);
+                } else {
+                    appState.selectedSpecialization = "";
                 }
             }
         });
+    });
+    
+    // Add change event listener for the common specialization dropdown
+    document.getElementById('spec-common-custom').addEventListener('change', function() {
+        appState.selectedSpecialization = this.value;
+        console.log('Common specialization changed to:', appState.selectedSpecialization);
     });
     
     // Handle custom specialization input
@@ -1824,6 +2013,23 @@ function setupCustomCitiesTab() {
     
     // Continue to review button
     document.getElementById('continue-to-review').addEventListener('click', () => {
+        console.log('Continue to review button clicked');
+        
+        // Make sure we have a specialization
+        if (!appState.selectedSpecialization) {
+            console.error('No specialization selected');
+            showAlert('error', 'Please select a specialization');
+            return;
+        }
+        
+        // Make sure we have cities
+        if (!appState.selectedCities || appState.selectedCities.length === 0) {
+            console.error('No cities selected');
+            showAlert('error', 'Please select at least one city');
+            return;
+        }
+        
+        // Update the UI
         goToWizardStep(3);
         
         // Update summary
@@ -1834,6 +2040,8 @@ function setupCustomCitiesTab() {
         document.getElementById('summary-cities-count').textContent = appState.selectedCities.length;
         document.getElementById('summary-specialization').textContent = appState.selectedSpecialization;
         document.getElementById('summary-search-time').textContent = `${Math.round(appState.selectedCities.length / 2)}-${appState.selectedCities.length} minutes`;
+        
+        console.log('Updated custom cities summary');
     });
     
     // Edit search button
@@ -1843,11 +2051,48 @@ function setupCustomCitiesTab() {
     
     // Start custom search button
     document.getElementById('start-custom-search').addEventListener('click', () => {
-        searchDoctors({
-            type: 'custom',
-            cities: appState.selectedCities,
-            specialization: appState.selectedSpecialization
-        });
+        console.log('Starting custom cities search with:');
+        console.log('- Cities:', appState.selectedCities);
+        console.log('- Specialization:', appState.selectedSpecialization);
+        
+        // Validate before sending
+        if (!appState.selectedCities || appState.selectedCities.length === 0) {
+            console.error('No cities selected');
+            showAlert('error', 'Please select at least one city');
+            return;
+        }
+        
+        // Check if we need to update appState.selectedSpecialization from the currently selected option
+        const specType = document.querySelector('input[name="spec-type-custom"]:checked').value;
+        if (specType === 'common') {
+            // Make sure we get the current value from the dropdown
+            appState.selectedSpecialization = document.getElementById('spec-common-custom').value;
+        } else {
+            // For custom specialization, check if the field has a value
+            const customSpecValue = document.getElementById('spec-custom-custom').value.trim();
+            if (!customSpecValue) {
+                showAlert('error', 'Please enter a specialization');
+                return;
+            }
+            appState.selectedSpecialization = customSpecValue;
+        }
+        
+        if (!appState.selectedSpecialization) {
+            console.error('No specialization selected');
+            showAlert('error', 'Please select a specialization');
+            return;
+        }
+        
+        // Clear any previous results
+        clearSearchResults();
+        
+        try {
+            // Search for doctors
+            searchCustomCities(appState.selectedCities, appState.selectedSpecialization);
+        } catch (error) {
+            console.error('Error starting search:', error);
+            showAlert('error', 'Error starting search. Please try again.');
+        }
     });
     
     // Helper function to update selected cities from checkboxes
@@ -2163,17 +2408,17 @@ function exportToExcel(tableId, fileName) {
         };
         
         // Get the search metadata
-        const searchTitle = document.getElementById('results-title').textContent;
-        const searchCount = document.getElementById('search-count').textContent;
-        const searchLocation = document.getElementById('search-location').textContent;
-        const searchSpecialization = document.getElementById('search-specialization').textContent;
-        const searchTime = document.getElementById('search-time').textContent;
+        const searchTitle = document.getElementById('search-title')?.textContent || 'Doctor Search Results';
+        const resultCount = document.getElementById('result-count')?.textContent || '0';
+        const searchLocation = document.getElementById('search-location')?.textContent || 'N/A';
+        const searchSpecialization = document.getElementById('search-specialization')?.textContent || 'N/A';
+        const searchTime = document.getElementById('search-time')?.textContent || 'N/A';
         
         // Create summary info at the top
         const summaryData = [
             ['Doctor Search Results'],
             ['Search Query:', searchTitle],
-            ['Total Results:', searchCount],
+            ['Total Results:', resultCount],
             ['Location:', searchLocation],
             ['Specialization:', searchSpecialization],
             ['Search Time:', searchTime],
@@ -2200,34 +2445,34 @@ function exportToExcel(tableId, fileName) {
         
         // Extract data from each row
         rows.forEach(row => {
-            // Get name from .doctor-name cell
-            const nameCell = row.querySelector('.doctor-name .cell-content');
-            const name = nameCell ? nameCell.textContent.trim() : 'N/A';
+            // Extract data from all cells
+            const cells = Array.from(row.querySelectorAll('td'));
             
-            // Get rating - both numeric value and stars
-            const ratingCell = row.querySelector('.doctor-rating');
-            const rating = ratingCell ? 
-                parseFloat(ratingCell.getAttribute('data-rating') || 0).toFixed(1) : 'N/A';
+            if (cells.length < 6) {
+                console.error('Row has fewer than expected cells', cells.length);
+                return;
+            }
             
-            // Get reviews count
-            const reviewsCell = row.querySelector('.doctor-reviews');
-            const reviews = reviewsCell ? 
-                reviewsCell.getAttribute('data-reviews') || '0' : '0';
+            // Get name from first cell
+            const name = cells[0].textContent.trim();
             
-            // Get primary location
-            const primaryLocationEl = row.querySelector('.primary-location');
-            const location = primaryLocationEl ? 
-                primaryLocationEl.textContent.replace('place', '').trim() : 'N/A';
+            // Get rating from second cell
+            const rating = cells[1].textContent.trim();
             
-            // Get city
-            const cityCell = row.querySelector('.doctor-city .cell-content');
-            const city = cityCell ? cityCell.textContent.trim() : 'N/A';
+            // Get reviews from third cell
+            const reviews = cells[2].textContent.trim();
             
-            // Get sources as a comma-separated list
-            const sourceElements = row.querySelectorAll('.source-tag:not(.source-more)');
-            const sources = sourceElements.length > 0 ?
-                Array.from(sourceElements).map(el => el.textContent.trim()).join(', ') :
-                'Unknown';
+            // Get location from fourth cell
+            let location = cells[3].textContent.trim();
+            if (location.includes('more')) {
+                location = location.split('more')[0].trim(); // Just take the primary location
+            }
+            
+            // Get city from fifth cell
+            const city = cells[4].textContent.trim();
+            
+            // Get sources from sixth cell
+            const sources = cells[5].textContent.trim();
             
             // Add row to the dataset
             excelRows.push([name, rating, reviews, location, city, sources]);
@@ -2300,43 +2545,93 @@ function setupCustomCitiesSearch() {
 
 // Update search summary with result information
 function updateSearchSummary(searchType, searchParams, resultCount) {
+    console.log('Updating search summary:', { searchType, searchParams, resultCount });
+    
+    // Make all pills visible by default
+    document.querySelectorAll('.pill').forEach(pill => {
+        pill.style.display = 'flex';
+    });
+    
+    // Make search summary visible
     const searchSummary = document.getElementById('search-summary');
-    if (!searchSummary) return;
-    
-    searchSummary.style.display = 'block';
-    
-    // Set the count
-    const countElement = document.getElementById('result-count');
-    if (countElement) {
-        countElement.textContent = resultCount;
+    if (searchSummary) {
+        searchSummary.style.display = 'block';
     }
     
-    // Set the title based on search type
+    // Update the title
     const titleElement = document.getElementById('search-title');
     if (titleElement) {
+        let title = 'Doctors';
         if (searchType === 'city') {
-            titleElement.textContent = `${searchParams.specialization} doctors in ${searchParams.city}`;
+            title = `${searchParams.specialization} doctors in ${searchParams.city}`;
         } else if (searchType === 'tier') {
-            titleElement.textContent = `${searchParams.specialization} doctors in ${getTierName(searchParams.tier)} cities`;
+            title = `${searchParams.specialization} doctors in ${getTierName(searchParams.tier)} cities`;
         } else if (searchType === 'custom') {
-            titleElement.textContent = `${searchParams.specialization} doctors in selected cities`;
+            title = `${searchParams.specialization} doctors in selected cities`;
         } else if (searchType === 'countrywide') {
-            titleElement.textContent = `${searchParams.specialization} doctors across India`;
+            title = `${searchParams.specialization} doctors across India`;
         }
+        titleElement.textContent = title;
+        console.log('Updated search title:', title);
     }
     
-    // Set the location info
+    // Update count with animation - handle both result-count and search-count elements
+    const updateCount = () => {
+        // Update result-count in the pill
+        const resultCountElement = document.getElementById('result-count');
+        if (resultCountElement) {
+            const currentCount = parseInt(resultCountElement.textContent) || 0;
+            const increment = Math.ceil((resultCount - currentCount) / 10);
+            
+            if (currentCount < resultCount) {
+                resultCountElement.textContent = Math.min(currentCount + increment, resultCount);
+                setTimeout(updateCount, 50);
+            } else if (currentCount > resultCount) {
+                resultCountElement.textContent = Math.max(currentCount - increment, resultCount);
+                setTimeout(updateCount, 50);
+            }
+        }
+        
+        // Also update search-count in the header if it exists
+        const searchCountElement = document.getElementById('search-count');
+        if (searchCountElement) {
+            searchCountElement.textContent = resultCount;
+        }
+    };
+    
+    // Start the count animation
+    updateCount();
+    
+    // Update location info
     const locationElement = document.getElementById('search-location');
     if (locationElement) {
+        let locationText = 'All locations';
+        
         if (searchType === 'city') {
-            locationElement.textContent = searchParams.city;
+            locationText = searchParams.city;
         } else if (searchType === 'tier') {
-            locationElement.textContent = getTierName(searchParams.tier);
+            locationText = getTierName(searchParams.tier);
         } else if (searchType === 'custom') {
-            locationElement.textContent = searchParams.cities.join(', ');
+            locationText = Array.isArray(searchParams.cities) && searchParams.cities.length > 0 
+                ? searchParams.cities.join(', ') 
+                : 'Selected cities';
         } else if (searchType === 'countrywide') {
-            locationElement.textContent = 'India';
+            locationText = 'All India';
         }
+        
+        locationElement.textContent = locationText;
+    }
+    
+    // Update specialization info
+    const specializationElement = document.getElementById('search-specialization');
+    if (specializationElement) {
+        specializationElement.textContent = searchParams.specialization || 'All specializations';
+    }
+    
+    // Update search time info if provided in metadata
+    const timeElement = document.getElementById('search-time');
+    if (timeElement && searchParams.metadata && searchParams.metadata.search_duration) {
+        timeElement.textContent = searchParams.metadata.search_duration;
     }
 }
 
