@@ -20,9 +20,22 @@ app.use('/assets', express.static(path.join(__dirname, 'assets')));
 app.use('/api', createProxyMiddleware({
     target: BACKEND_API_URL,
     changeOrigin: true,
-    pathRewrite: {
-        '^/api': '/api'  // Keep /api prefix when forwarding to backend
-    }
+    pathRewrite: function(path) {
+        // If BACKEND_API_URL already includes /api, don't duplicate it
+        if (BACKEND_API_URL.endsWith('/api')) {
+            return path.replace(/^\/api/, '');
+        }
+        // Otherwise keep as is
+        return path;
+    },
+    onError: (err, req, res) => {
+        console.error('Proxy error:', err);
+        res.status(500).json({
+            error: 'Proxy Error',
+            message: 'Failed to communicate with the backend service'
+        });
+    },
+    logLevel: 'debug'
 }));
 
 // Serve the HTML for all other routes

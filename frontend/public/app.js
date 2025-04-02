@@ -1,5 +1,5 @@
 // Constants and data
-const BACKEND_API_URL = "http://localhost:8000";
+const BACKEND_API_URL = "/api";  // Changed from "http://localhost:8000" to use relative path
 
 // City tiers for India
 const INDIA_CITIES = {
@@ -666,47 +666,48 @@ const API = {
     // Search doctors via backend API
     async searchDoctors(params) {
         try {
-            // Get base URL for API calls
+            // Get base URL for API calls - now just use the relative paths
             let baseUrl = BACKEND_API_URL;
-            // Remove trailing slash if present
-            if (baseUrl.endsWith('/')) {
-                baseUrl = baseUrl.slice(0, -1);
-            }
             
-            let endpoint = `${baseUrl}/api/search`;
+            // Define endpoints without duplicating /api prefix
+            let endpoint = '';
             let requestBody = {};
             
             // Build request body based on search type
             if (params.type === 'city') {
+                endpoint = '/search';
                 requestBody = {
                     city: params.city,
                     specialization: params.specialization
                 };
             } else if (params.type === 'tier') {
-                endpoint = `${baseUrl}/api/search/tier`;
+                endpoint = '/search/tier';
                 requestBody = {
                     tier: params.tier,
                     specialization: params.specialization
                 };
             } else if (params.type === 'custom') {
-                endpoint = `${baseUrl}/api/search/custom`;
+                endpoint = '/search/custom';
                 requestBody = {
                     cities: params.cities,
                     specialization: params.specialization
                 };
             } else if (params.type === 'countrywide') {
-                endpoint = `${baseUrl}/api/search/countrywide`;
+                endpoint = '/search/countrywide';
                 requestBody = {
                     country: 'India',
                     specialization: params.specialization
                 };
             }
             
-            console.log(`Sending ${params.type} search request to: ${endpoint}`);
+            // Combine base URL and endpoint
+            const fullUrl = `${baseUrl}${endpoint}`;
+            
+            console.log(`Sending ${params.type} search request to: ${fullUrl}`);
             console.log('Request body:', JSON.stringify(requestBody, null, 2));
             
             // Real API call
-            const response = await fetch(endpoint, {
+            const response = await fetch(fullUrl, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

@@ -10,6 +10,7 @@ import asyncio
 import logging
 from datetime import datetime
 import json
+import sys
 
 # Load environment variables
 load_dotenv()
@@ -34,10 +35,10 @@ app = FastAPI(
 # Get frontend URL from environment variable
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
 
-# Configure CORS
+# Configure CORS - allow more origins for production
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[FRONTEND_URL],  # Restrict to frontend URL
+    allow_origins=["*"],  # Allow requests from any origin in production
     allow_credentials=True,
     allow_methods=["*"],  # Allows all methods
     allow_headers=["*"],  # Allows all headers
@@ -456,6 +457,19 @@ async def search_doctors_by_custom_cities(request: CustomCitiesSearchRequest):
                 }
             }
         )
+
+@app.get("/api/debug")
+async def debug_info():
+    """Debug endpoint to check API connectivity and configuration"""
+    return {
+        "status": "ok",
+        "version": "1.0.0",
+        "time": datetime.now().isoformat(),
+        "env": {
+            "frontend_url": FRONTEND_URL,
+            "python_version": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+        }
+    }
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
