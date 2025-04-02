@@ -874,17 +874,18 @@ function formatLocations(locations) {
     // If there are additional locations, add a dropdown
     if (locations.length > 1) {
         const remainingLocations = locations.slice(1);
+        const locationCount = remainingLocations.length;
         
         html += `<div class="location-dropdown">
                   <span class="location-count" onclick="toggleLocationDropdown(this)">
-                    <i class="material-icons">add_circle</i> ${remainingLocations.length} more
+                    <i class="material-icons">add_circle</i> ${locationCount} more
                   </span>
                   <div class="location-dropdown-content">
                     <div class="dropdown-header">All Locations (${locations.length})</div>`;
         
         // Add all locations to the dropdown with numbering
         locations.forEach((location, index) => {
-            html += `<div title="${location}"><i class="material-icons">place</i> ${location}</div>`;
+            html += `<div class="location-item" title="${location}"><i class="material-icons">place</i> ${location}</div>`;
         });
         
         html += `</div></div>`;
@@ -900,6 +901,11 @@ function formatSources(sources) {
         return '<span class="source-tag source-unknown" title="No known source"><i class="material-icons">help_outline</i> Unknown</span>';
     }
     
+    // Normalize and filter unique sources
+    const uniqueSources = Array.from(new Set(sources.map(s => 
+        typeof s === 'string' ? s.trim().toLowerCase() : 'unknown'
+    )));
+    
     // Define color mapping for different sources with improved styling
     const sourceMapping = {
         'practo': { color: '#13b2b8', icon: 'local_hospital', name: 'Practo' },
@@ -907,19 +913,19 @@ function formatSources(sources) {
         'general': { color: '#4285F4', icon: 'search', name: 'General' },
         'hospital': { color: '#34a853', icon: 'local_hospital', name: 'Hospital' },
         'social': { color: '#fbbc05', icon: 'people', name: 'Social' },
-        'unknown': { color: '#f1f3f5', icon: 'help_outline', name: 'Unknown' }
+        'unknown': { color: '#9e9e9e', icon: 'help_outline', name: 'Unknown' }
     };
     
     // Limit to max 2 sources to prevent overflow
     const maxSourcesToShow = 2;
-    const visibleSources = sources.slice(0, maxSourcesToShow);
-    const hiddenCount = Math.max(0, sources.length - maxSourcesToShow);
+    const visibleSources = uniqueSources.slice(0, maxSourcesToShow);
+    const hiddenCount = Math.max(0, uniqueSources.length - maxSourcesToShow);
     
     // Format each source tag with color and icon - improved style
     let sourceTags = visibleSources.map(source => {
-        const sourceLower = source.toLowerCase();
+        // Find the best matching source mapping
         const mapping = Object.keys(sourceMapping).find(key => 
-            sourceLower.includes(key) || key.includes(sourceLower)
+            source === key || source.includes(key)
         ) || 'unknown';
         
         const sourceInfo = sourceMapping[mapping];
@@ -933,8 +939,11 @@ function formatSources(sources) {
     
     // Add "more" tag if there are additional sources
     if (hiddenCount > 0) {
+        const hiddenSources = uniqueSources.slice(maxSourcesToShow);
+        const hiddenSourcesTitle = hiddenSources.join(', ');
+        
         sourceTags += `<span class="source-tag source-more" 
-                             title="${sources.slice(maxSourcesToShow).join(', ')}">
+                             title="${hiddenSourcesTitle}">
                          <i class="material-icons">add</i> ${hiddenCount}
                      </span>`;
     }
@@ -944,17 +953,26 @@ function formatSources(sources) {
 
 // Improved rating stars display with clearer indicators
 function getRatingStars(rating) {
+    // Return "Not Rated" for falsy values (0, null, undefined)
     if (!rating) return '<span class="no-rating">Not Rated</span>';
+    
+    // Convert rating to number and validate
+    rating = parseFloat(rating);
+    if (isNaN(rating)) return '<span class="no-rating">Invalid Rating</span>';
+    
+    // Clamp rating between 0 and 5
+    rating = Math.max(0, Math.min(5, rating));
     
     const fullStars = Math.floor(rating);
     const hasHalfStar = rating % 1 >= 0.3; // Lower threshold to show half stars
-    let starsHTML = '';
+    let starsHTML = '<div class="stars-container">';
     
-    // Use material icons for stars with proper styling
+    // Add full stars
     for (let i = 0; i < fullStars; i++) {
         starsHTML += '<i class="material-icons star-filled">star</i>';
     }
     
+    // Add half star if needed
     if (hasHalfStar) {
         starsHTML += '<i class="material-icons star-half">star_half</i>';
     }
@@ -964,6 +982,8 @@ function getRatingStars(rating) {
     for (let i = 0; i < emptyStars; i++) {
         starsHTML += '<i class="material-icons star-empty">star_border</i>';
     }
+    
+    starsHTML += '</div>';
     
     // Add numeric rating with improved styling
     starsHTML += `<span class="numeric-rating">${rating.toFixed(1)}</span>`;
@@ -1011,7 +1031,20 @@ function verifyTablesPopulated() {
 
 // Toggle location dropdown visibility
 function toggleLocationDropdown(element) {
-    const dropdown = element.nextElementSibling;
+    // Find the dropdown content element more reliably
+    // First, find the parent location-dropdown container
+    const dropdownContainer = element.closest('.location-dropdown');
+    if (!dropdownContainer) {
+        console.error('Location dropdown container not found');
+        return;
+    }
+    
+    // Then find the dropdown content within this container
+    const dropdown = dropdownContainer.querySelector('.location-dropdown-content');
+    if (!dropdown) {
+        console.error('Location dropdown content not found');
+        return;
+    }
     
     // Close any open dropdowns first
     document.querySelectorAll('.location-dropdown-content.visible').forEach(openDropdown => {
@@ -1021,33 +1054,35 @@ function toggleLocationDropdown(element) {
     });
     
     // Toggle this dropdown
-    if (dropdown) {
-        dropdown.classList.toggle('visible');
-        
-        // Position the dropdown correctly
-        const rect = element.getBoundingClientRect();
-        const tableRect = document.querySelector('.doctors-table').getBoundingClientRect();
-        
-        // Handle positioning so it doesn't go off screen
-        if (rect.left + dropdown.offsetWidth > window.innerWidth) {
-            dropdown.style.left = 'auto';
-            dropdown.style.right = '0';
-        } else {
-            dropdown.style.left = '0';
-            dropdown.style.right = 'auto';
-        }
-        
-        // Close when clicking outside
-        function closeDropdown(e) {
-            if (!dropdown.contains(e.target) && e.target !== element) {
-                dropdown.classList.remove('visible');
-                document.removeEventListener('click', closeDropdown);
-            }
-        }
-        
-        // Add event listener to detect clicks outside
-        document.addEventListener('click', closeDropdown);
+    dropdown.classList.toggle('visible');
+    
+    // Position the dropdown correctly
+    const rect = element.getBoundingClientRect();
+    const tableRect = document.querySelector('.doctors-table').getBoundingClientRect();
+    
+    // Handle positioning so it doesn't go off screen
+    if (rect.left + dropdown.offsetWidth > window.innerWidth) {
+        dropdown.style.left = 'auto';
+        dropdown.style.right = '0';
+    } else {
+        dropdown.style.left = '0';
+        dropdown.style.right = 'auto';
     }
+    
+    // Close when clicking outside
+    function closeDropdown(e) {
+        // Only close if clicking outside the dropdown and the toggle element
+        if (!dropdown.contains(e.target) && !element.contains(e.target)) {
+            dropdown.classList.remove('visible');
+            document.removeEventListener('click', closeDropdown);
+        }
+    }
+    
+    // Add event listener to detect clicks outside
+    // Use setTimeout to avoid the current click event from immediately closing the dropdown
+    setTimeout(() => {
+        document.addEventListener('click', closeDropdown);
+    }, 0);
 }
 
 // Enhanced display search results function with better table interactions
@@ -1931,12 +1966,7 @@ function setupResultsControls() {
     
     sortBySelect.addEventListener('change', updateAllTables);
     
-    // Export button
-    document.getElementById('export-excel').addEventListener('click', () => {
-        // For demo purposes, just show an alert
-        alert('In a production environment, this would export the data to Excel.');
-        // In a real implementation, we would prepare the data and trigger a download
-    });
+    // Note: The export button functionality is now handled in the setupExportButton function
 }
 
 // Format number to friendly display (e.g. 1.2k for 1,200)
@@ -2107,5 +2137,3 @@ function exportToExcel(tableId, fileName) {
         showMessage('Error exporting to Excel: ' + error.message, 'error');
     }
 }
-
-// UI will be continued in the next part 
