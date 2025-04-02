@@ -1053,134 +1053,118 @@ class DoctorSearchApp:
 
     async def search_countrywide(self, country: str, specialization: str) -> List[Doctor]:
         """
-        Search for doctors across multiple cities in a country
-        Currently only supports India with tiered city approach
-        Always searches all tiers regardless of result counts to maximize coverage
-        Implements throttling to prevent rate limiting issues
+        Search for doctors across an entire country (currently only supports India).
+        Uses a tiered approach to search major cities first, then a selection of smaller cities.
+        
+        Args:
+            country: The country to search, currently only 'india' is supported
+            specialization: The medical specialization to search for
+        
+        Returns:
+            List of unique doctors found across the country
         """
         if country.lower() != "india":
-            logger.warning(f"Countrywide search not supported for {country}")
+            logger.error(f"Countrywide search is currently only supported for India, got: {country}")
             return []
         
         all_doctors = []
         
-        # Create progress context
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            BarColumn(),
-            TaskProgressColumn(),
-            console=console
-        ) as progress:
-            main_task = progress.add_task(f"[cyan]Searching across India for {specialization} doctors...", total=100)
-            
-            # Search Tier 1 cities (major metros)
-            tier1_count = len(self.india_cities["tier1"])
-            tier1_task = progress.add_task(f"[blue]Searching Tier 1 cities...", total=tier1_count, parent=main_task)
-            
-            tier1_cities = self.india_cities["tier1"]
-            tier1_results = []
-            
-            for city in tier1_cities:
-                city_task = progress.add_task(f"Searching {city.title()}", parent=tier1_task)
-                try:
-                    # Search all sources for this city with a retry mechanism
-                    doctors = await self.search_city_with_retry(city, specialization)
-                    if doctors:
-                        tier1_results.extend(doctors)
-                        progress.update(city_task, completed=1, description=f"[green]Found {len(doctors)} doctors in {city.title()}")
-                    else:
-                        progress.update(city_task, completed=1, description=f"[yellow]No doctors found in {city.title()}")
-                    
-                    # Add a delay between city searches to avoid rate limiting
-                    await asyncio.sleep(1)
-                except Exception as e:
-                    logger.error(f"Error searching {city}: {str(e)}")
-                    progress.update(city_task, completed=1, description=f"[red]Error searching {city.title()}")
+        # For India, we'll search all Tier 1 cities and a selection of Tier 2 and Tier 3
+        tier1_cities = self.india_cities["tier1"]
+        
+        # For API version, we'll only select a subset of Tier 2 and 3 cities to prevent long search times
+        # Get a random selection of Tier 2 cities (5 cities)
+        tier2_selection = random.sample(self.india_cities["tier2"], min(5, len(self.india_cities["tier2"])))
+        
+        # Get a random selection of Tier 3 cities (3 cities)
+        tier3_selection = random.sample(self.india_cities["tier3"], min(3, len(self.india_cities["tier3"])))
+        
+        # Log search info
+        logger.info(f"Starting countrywide search for {specialization} in India")
+        logger.info(f"Searching all {len(tier1_cities)} Tier 1 cities, {len(tier2_selection)} Tier 2 cities, and {len(tier3_selection)} Tier 3 cities")
+        
+        # Search Tier 1 cities
+        tier1_results = []
+        logger.info(f"Searching Tier 1 cities for {specialization}")
+        
+        for city in tier1_cities:
+            try:
+                logger.info(f"Searching {city.title()} (Tier 1)")
+                doctors = await self.search_city_with_retry(city, specialization, max_retries=2)
                 
-                progress.update(tier1_task, advance=1)
-            
-            all_doctors.extend(tier1_results)
-            progress.update(main_task, advance=40)  # 40% progress after Tier 1
-            
-            # Add a delay before starting Tier 2 searches to avoid rate limiting
-            await asyncio.sleep(2)
-            
-            # Always search Tier 2 cities (smaller but significant cities)
-            # Select a subset to avoid too many API calls but still get good coverage
-            tier2_sample = random.sample(self.india_cities["tier2"], min(6, len(self.india_cities["tier2"])))
-            tier2_count = len(tier2_sample)
-            tier2_task = progress.add_task(f"[blue]Searching Tier 2 cities...", total=tier2_count, parent=main_task)
-            
-            tier2_results = []
-            for city in tier2_sample:
-                city_task = progress.add_task(f"Searching {city.title()}", parent=tier2_task)
-                try:
-                    doctors = await self.search_city_with_retry(city, specialization)
-                    if doctors:
-                        tier2_results.extend(doctors)
-                        progress.update(city_task, completed=1, description=f"[green]Found {len(doctors)} doctors in {city.title()}")
-                    else:
-                        progress.update(city_task, completed=1, description=f"[yellow]No doctors found in {city.title()}")
-                    
-                    # Add a delay between city searches to avoid rate limiting
-                    await asyncio.sleep(1)
-                except Exception as e:
-                    logger.error(f"Error searching {city}: {str(e)}")
-                    progress.update(city_task, completed=1, description=f"[red]Error searching {city.title()}")
+                if doctors:
+                    tier1_results.extend(doctors)
+                    logger.info(f"Found {len(doctors)} doctors in {city.title()}")
+                else:
+                    logger.info(f"No doctors found in {city.title()}")
                 
-                progress.update(tier2_task, advance=1)
-            
-            all_doctors.extend(tier2_results)
-            progress.update(main_task, advance=30)  # 70% progress after Tier 2
-            
-            # Add a delay before starting Tier 3 searches to avoid rate limiting
-            await asyncio.sleep(2)
-            
-            # Always search Tier 3 cities for comprehensive coverage
-            tier3_sample = random.sample(self.india_cities["tier3"], min(4, len(self.india_cities["tier3"])))
-            tier3_count = len(tier3_sample)
-            tier3_task = progress.add_task(f"[blue]Searching Tier 3 cities...", total=tier3_count, parent=main_task)
-            
-            tier3_results = []
-            for city in tier3_sample:
-                city_task = progress.add_task(f"Searching {city.title()}", parent=tier3_task)
-                try:
-                    doctors = await self.search_city_with_retry(city, specialization)
-                    if doctors:
-                        tier3_results.extend(doctors)
-                        progress.update(city_task, completed=1, description=f"[green]Found {len(doctors)} doctors in {city.title()}")
-                    else:
-                        progress.update(city_task, completed=1, description=f"[yellow]No doctors found in {city.title()}")
-                    
-                    # Add a delay between city searches to avoid rate limiting
-                    await asyncio.sleep(1)
-                except Exception as e:
-                    logger.error(f"Error searching {city}: {str(e)}")
-                    progress.update(city_task, completed=1, description=f"[red]Error searching {city.title()}")
+                # Add a delay between city searches
+                await asyncio.sleep(1)
+            except Exception as e:
+                logger.error(f"Error searching {city}: {str(e)}")
+        
+        # Search Tier 2 cities
+        tier2_results = []
+        logger.info(f"Searching selected Tier 2 cities for {specialization}")
+        
+        for city in tier2_selection:
+            try:
+                logger.info(f"Searching {city.title()} (Tier 2)")
+                doctors = await self.search_city_with_retry(city, specialization, max_retries=2)
                 
-                progress.update(tier3_task, advance=1)
-            
-            all_doctors.extend(tier3_results)
-            progress.update(main_task, advance=30)  # 100% progress after Tier 3
-            
-            # Deduplicate across all cities
-            if all_doctors:
-                pre_dedup_count = len(all_doctors)
-                all_doctors = DataProcessor.deduplicate_doctors(all_doctors, self.config.FUZZY_MATCH_THRESHOLD)
-                post_dedup_count = len(all_doctors)
+                if doctors:
+                    tier2_results.extend(doctors)
+                    logger.info(f"Found {len(doctors)} doctors in {city.title()}")
+                else:
+                    logger.info(f"No doctors found in {city.title()}")
                 
-                # Save to database
-                self.db_manager.save_doctors(all_doctors)
+                # Add a delay between city searches
+                await asyncio.sleep(1)
+            except Exception as e:
+                logger.error(f"Error searching {city}: {str(e)}")
+        
+        # Search Tier 3 cities
+        tier3_results = []
+        logger.info(f"Searching selected Tier 3 cities for {specialization}")
+        
+        for city in tier3_selection:
+            try:
+                logger.info(f"Searching {city.title()} (Tier 3)")
+                doctors = await self.search_city_with_retry(city, specialization, max_retries=2)
                 
-                tier_summary = f"Tier 1: {len(tier1_results)}, Tier 2: {len(tier2_results)}, Tier 3: {len(tier3_results)}"
-                dedup_info = f"(removed {pre_dedup_count - post_dedup_count} duplicates)"
-                console.print(f"[bold green]Found {len(all_doctors)} unique doctors across India after deduplication {dedup_info}[/bold green]")
-                console.print(f"[bold blue]City tier summary: {tier_summary}[/bold blue]")
-            else:
-                console.print("[yellow]No doctors found matching your search criteria in India[/yellow]")
+                if doctors:
+                    tier3_results.extend(doctors)
+                    logger.info(f"Found {len(doctors)} doctors in {city.title()}")
+                else:
+                    logger.info(f"No doctors found in {city.title()}")
+                
+                # Add a delay between city searches
+                await asyncio.sleep(1)
+            except Exception as e:
+                logger.error(f"Error searching {city}: {str(e)}")
+        
+        # Combine results from all tiers
+        all_doctors.extend(tier1_results)
+        all_doctors.extend(tier2_results)
+        all_doctors.extend(tier3_results)
+        
+        # Deduplicate across all cities
+        if all_doctors:
+            pre_dedup_count = len(all_doctors)
+            all_doctors = DataProcessor.deduplicate_doctors(all_doctors, self.config.FUZZY_MATCH_THRESHOLD)
+            post_dedup_count = len(all_doctors)
             
-            return all_doctors
+            # Save to database
+            self.db_manager.save_doctors(all_doctors)
+            
+            tier_summary = f"Tier 1: {len(tier1_results)}, Tier 2: {len(tier2_results)}, Tier 3: {len(tier3_results)}"
+            dedup_info = f"(removed {pre_dedup_count - post_dedup_count} duplicates)"
+            logger.info(f"Found {len(all_doctors)} unique doctors across India after deduplication {dedup_info}")
+            logger.info(f"City tier summary: {tier_summary}")
+        else:
+            logger.info(f"No doctors found matching your search criteria in India")
+        
+        return all_doctors
 
     async def search_city_with_retry(self, city: str, specialization: str, max_retries: int = 3) -> List[Doctor]:
         """
@@ -1292,64 +1276,56 @@ class DoctorSearchApp:
             return []
         
         all_doctors = []
+        tier_results = []
+        failed_cities = []
         
-        # Create progress context
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            BarColumn(),
-            TaskProgressColumn(),
-            console=console
-        ) as progress:
-            main_task = progress.add_task(f"[cyan]Searching {tier} cities for {specialization} doctors...", total=100)
-            
-            # Get list of cities in this tier
-            tier_cities = self.india_cities[tier]
-            tier_count = len(tier_cities)
-            tier_task = progress.add_task(f"[blue]Searching {tier} cities...", total=tier_count, parent=main_task)
-            
-            tier_results = []
-            
-            for city in tier_cities:
-                city_task = progress.add_task(f"Searching {city.title()}", parent=tier_task)
-                try:
-                    # Use search_all_sources directly for consistent results with single city search
-                    doctors = await self.search_all_sources(city, specialization)
-                    
-                    if doctors:
-                        tier_results.extend(doctors)
-                        progress.update(city_task, completed=1, description=f"[green]Found {len(doctors)} doctors in {city.title()}")
-                    else:
-                        progress.update(city_task, completed=1, description=f"[yellow]No doctors found in {city.title()}")
-                    
-                    # Add a delay between city searches to avoid rate limiting
-                    await asyncio.sleep(1)
-                except Exception as e:
-                    logger.error(f"Error searching {city}: {str(e)}")
-                    progress.update(city_task, completed=1, description=f"[red]Error searching {city.title()}")
+        # Get list of cities in this tier
+        tier_cities = self.india_cities[tier]
+        tier_count = len(tier_cities)
+        
+        # Using normal logging instead of live progress for API calls
+        logger.info(f"Starting search for {specialization} in {tier_count} cities of {tier}")
+        
+        for city in tier_cities:
+            try:
+                # Use search_city_with_retry for more reliable results
+                logger.info(f"Searching {city.title()} for {specialization}")
+                doctors = await self.search_city_with_retry(city, specialization, max_retries=2)
                 
-                progress.update(tier_task, advance=1)
-            
-            all_doctors.extend(tier_results)
-            progress.update(main_task, advance=100)  # 100% progress
-            
-            # Deduplicate across all cities
-            if all_doctors:
-                pre_dedup_count = len(all_doctors)
-                all_doctors = DataProcessor.deduplicate_doctors(all_doctors, self.config.FUZZY_MATCH_THRESHOLD)
-                post_dedup_count = len(all_doctors)
+                if doctors:
+                    tier_results.extend(doctors)
+                    logger.info(f"Found {len(doctors)} doctors in {city.title()}")
+                else:
+                    logger.info(f"No doctors found in {city.title()}")
                 
-                # Save to database
-                self.db_manager.save_doctors(all_doctors)
-                
-                tier_summary = f"{tier}: {len(tier_results)}"
-                dedup_info = f"(removed {pre_dedup_count - post_dedup_count} duplicates)"
-                console.print(f"[bold green]Found {len(all_doctors)} unique doctors across {tier} cities after deduplication {dedup_info}[/bold green]")
-                console.print(f"[bold blue]Tier summary: {tier_summary}[/bold blue]")
-            else:
-                console.print(f"[yellow]No doctors found matching your search criteria in {tier} cities[/yellow]")
+                # Add a delay between city searches to avoid rate limiting
+                await asyncio.sleep(1)
+            except Exception as e:
+                logger.error(f"Error searching {city}: {str(e)}")
+                failed_cities.append(city)
+        
+        all_doctors.extend(tier_results)
+        
+        # Deduplicate across all cities
+        if all_doctors:
+            pre_dedup_count = len(all_doctors)
+            all_doctors = DataProcessor.deduplicate_doctors(all_doctors, self.config.FUZZY_MATCH_THRESHOLD)
+            post_dedup_count = len(all_doctors)
             
-            return all_doctors
+            # Save to database
+            self.db_manager.save_doctors(all_doctors)
+            
+            tier_summary = f"{tier}: {len(tier_results)}"
+            dedup_info = f"(removed {pre_dedup_count - post_dedup_count} duplicates)"
+            logger.info(f"Found {len(all_doctors)} unique doctors across {tier} cities after deduplication {dedup_info}")
+            logger.info(f"Tier summary: {tier_summary}")
+            
+            if failed_cities:
+                logger.info(f"Note: Search failed for the following cities: {', '.join(failed_cities)}")
+        else:
+            logger.info(f"No doctors found matching your search criteria in {tier} cities")
+        
+        return all_doctors
 
     async def search_custom_cities(self, cities: List[str], specialization: str) -> List[Doctor]:
         """
@@ -1367,60 +1343,50 @@ class DoctorSearchApp:
             return []
         
         all_doctors = []
+        custom_results = []
+        failed_cities = []
         
-        # Create progress context
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            BarColumn(),
-            TaskProgressColumn(),
-            console=console
-        ) as progress:
-            main_task = progress.add_task(f"[cyan]Searching {len(cities)} custom cities for {specialization} doctors...", total=100)
-            cities_task = progress.add_task(f"[blue]Searching custom cities...", total=len(cities), parent=main_task)
-            
-            custom_results = []
-            
-            for city in cities:
-                city_task = progress.add_task(f"Searching {city.title()}", parent=cities_task)
-                try:
-                    # Use search_all_sources directly for consistent results with single city search
-                    doctors = await self.search_all_sources(city, specialization)
-                    
-                    if doctors:
-                        custom_results.extend(doctors)
-                        progress.update(city_task, completed=1, description=f"[green]Found {len(doctors)} doctors in {city.title()}")
-                    else:
-                        progress.update(city_task, completed=1, description=f"[yellow]No doctors found in {city.title()}")
-                    
-                    # Add a delay between city searches to avoid rate limiting
-                    await asyncio.sleep(1)
-                except Exception as e:
-                    logger.error(f"Error searching {city}: {str(e)}")
-                    progress.update(city_task, completed=1, description=f"[red]Error searching {city.title()}")
+        # Log start of search
+        logger.info(f"Starting search for {specialization} in {len(cities)} custom cities: {', '.join(cities)}")
+        
+        for city in cities:
+            try:
+                # Search each city
+                logger.info(f"Searching {city.title()} for {specialization}")
+                doctors = await self.search_city_with_retry(city, specialization, max_retries=2)
                 
-                progress.update(cities_task, advance=1)
-                progress.update(main_task, advance=100 // len(cities))
-            
-            all_doctors.extend(custom_results)
-            progress.update(main_task, completed=100)  # Ensure 100% progress
-            
-            # Deduplicate across all cities
-            if all_doctors:
-                pre_dedup_count = len(all_doctors)
-                all_doctors = DataProcessor.deduplicate_doctors(all_doctors, self.config.FUZZY_MATCH_THRESHOLD)
-                post_dedup_count = len(all_doctors)
+                if doctors:
+                    custom_results.extend(doctors)
+                    logger.info(f"Found {len(doctors)} doctors in {city.title()}")
+                else:
+                    logger.info(f"No doctors found in {city.title()}")
                 
-                # Save to database
-                self.db_manager.save_doctors(all_doctors)
-                
-                dedup_info = f"(removed {pre_dedup_count - post_dedup_count} duplicates)"
-                console.print(f"[bold green]Found {len(all_doctors)} unique doctors across custom cities after deduplication {dedup_info}[/bold green]")
-                console.print(f"[bold blue]Searched in: {', '.join(cities)}[/bold blue]")
-            else:
-                console.print(f"[yellow]No doctors found matching your search criteria in the specified cities[/yellow]")
+                # Add a delay between city searches to avoid rate limiting
+                await asyncio.sleep(1)
+            except Exception as e:
+                logger.error(f"Error searching {city}: {str(e)}")
+                failed_cities.append(city)
+        
+        all_doctors.extend(custom_results)
+        
+        # Deduplicate across all cities
+        if all_doctors:
+            pre_dedup_count = len(all_doctors)
+            all_doctors = DataProcessor.deduplicate_doctors(all_doctors, self.config.FUZZY_MATCH_THRESHOLD)
+            post_dedup_count = len(all_doctors)
             
-            return all_doctors
+            # Save to database
+            self.db_manager.save_doctors(all_doctors)
+            
+            dedup_info = f"(removed {pre_dedup_count - post_dedup_count} duplicates)"
+            logger.info(f"Found {len(all_doctors)} unique doctors across custom cities after deduplication {dedup_info}")
+            
+            if failed_cities:
+                logger.info(f"Note: Search failed for the following cities: {', '.join(failed_cities)}")
+        else:
+            logger.info(f"No doctors found matching your search criteria in custom cities")
+        
+        return all_doctors
 
     async def run(self, location: str, specialization: str):
         """Main execution flow"""

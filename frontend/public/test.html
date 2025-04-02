@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .card {
+            border: 1px solid #ccc;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        button {
+            padding: 10px 15px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-bottom: 10px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        pre {
+            background-color: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            max-height: 300px;
+            font-size: 14px;
+        }
+        .result-info {
+            margin-top: 20px;
+            border-top: 1px solid #eee;
+            padding-top: 10px;
+        }
+        .status {
+            padding: 5px 10px;
+            border-radius: 4px;
+            display: inline-block;
+            margin-bottom: 10px;
+        }
+        .status-success {
+            background-color: #dff0d8;
+            color: #3c763d;
+        }
+        .status-error {
+            background-color: #f2dede;
+            color: #a94442;
+        }
+        .status-loading {
+            background-color: #d9edf7;
+            color: #31708f;
+        }
+    </style>
+</head>
+<body>
+    <h1>API Test Page</h1>
+    
+    <div class="container">
+        <div class="card">
+            <h2>Single City Search</h2>
+            <button onclick="testSingleCitySearch()">Test Single City Search</button>
+            <div id="single-city-result"></div>
+        </div>
+        
+        <div class="card">
+            <h2>Tier-wise Search</h2>
+            <button onclick="testTierSearch()">Test Tier Search</button>
+            <div id="tier-result"></div>
+        </div>
+        
+        <div class="card">
+            <h2>Custom Cities Search</h2>
+            <button onclick="testCustomSearch()">Test Custom Cities Search</button>
+            <div id="custom-result"></div>
+        </div>
+    </div>
+
+    <script>
+        const BACKEND_API_URL = '';
+        
+        // Test Single City Search
+        async function testSingleCitySearch() {
+            const resultDiv = document.getElementById('single-city-result');
+            resultDiv.innerHTML = '<div class="status status-loading">Loading...</div>';
+            
+            try {
+                const response = await fetch(`${BACKEND_API_URL}/api/search`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        city: 'Mumbai',
+                        specialization: 'Cardiologist'
+                    })
+                });
+                
+                const data = await response.json();
+                
+                // Display result
+                const statusClass = response.ok ? 'status-success' : 'status-error';
+                const statusText = response.ok ? 'Success' : 'Failed';
+                
+                resultDiv.innerHTML = `
+                    <div class="status ${statusClass}">Status: ${response.status} ${statusText}</div>
+                    <div class="result-info">
+                        <p><strong>Doctors found:</strong> ${data.data ? data.data.length : 0}</p>
+                        <p><strong>Search duration:</strong> ${data.metadata?.search_duration?.toFixed(2) || 'N/A'} seconds</p>
+                    </div>
+                    <details>
+                        <summary>View response data</summary>
+                        <pre>${JSON.stringify(data, null, 2).substring(0, 1000)}...</pre>
+                    </details>
+                `;
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="status status-error">Error: ${error.message}</div>`;
+            }
+        }
+
+        // Test Tier-wise Search
+        async function testTierSearch() {
+            const resultDiv = document.getElementById('tier-result');
+            resultDiv.innerHTML = '<div class="status status-loading">Loading...</div>';
+            
+            try {
+                const response = await fetch(`${BACKEND_API_URL}/api/search/tier`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        tier: 'tier1',
+                        specialization: 'Cardiologist'
+                    })
+                });
+                
+                const data = await response.json();
+                
+                // Display result
+                const statusClass = response.ok ? 'status-success' : 'status-error';
+                const statusText = response.ok ? 'Success' : 'Failed';
+                
+                resultDiv.innerHTML = `
+                    <div class="status ${statusClass}">Status: ${response.status} ${statusText}</div>
+                    <div class="result-info">
+                        <p><strong>Doctors found:</strong> ${data.data ? data.data.length : 0}</p>
+                        <p><strong>Search duration:</strong> ${data.metadata?.search_duration?.toFixed(2) || 'N/A'} seconds</p>
+                    </div>
+                    <details>
+                        <summary>View response data</summary>
+                        <pre>${JSON.stringify(data, null, 2).substring(0, 1000)}...</pre>
+                    </details>
+                `;
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="status status-error">Error: ${error.message}</div>`;
+            }
+        }
+        
+        // Test Custom Cities Search
+        async function testCustomSearch() {
+            const resultDiv = document.getElementById('custom-result');
+            resultDiv.innerHTML = '<div class="status status-loading">Loading...</div>';
+            
+            try {
+                const response = await fetch(`${BACKEND_API_URL}/api/search/custom`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        cities: ['Mumbai', 'Delhi'],
+                        specialization: 'Cardiologist'
+                    })
+                });
+                
+                const data = await response.json();
+                
+                // Display result
+                const statusClass = response.ok ? 'status-success' : 'status-error';
+                const statusText = response.ok ? 'Success' : 'Failed';
+                
+                resultDiv.innerHTML = `
+                    <div class="status ${statusClass}">Status: ${response.status} ${statusText}</div>
+                    <div class="result-info">
+                        <p><strong>Doctors found:</strong> ${data.data ? data.data.length : 0}</p>
+                        <p><strong>Search duration:</strong> ${data.metadata?.search_duration?.toFixed(2) || 'N/A'} seconds</p>
+                    </div>
+                    <details>
+                        <summary>View response data</summary>
+                        <pre>${JSON.stringify(data, null, 2).substring(0, 1000)}...</pre>
+                    </details>
+                `;
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="status status-error">Error: ${error.message}</div>`;
+            }
+        }
+    </script>
+</body>
+</html> 

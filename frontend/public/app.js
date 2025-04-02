@@ -565,11 +565,7 @@ function setupSingleCityTab() {
         }
         
         // Perform search
-        searchDoctors({
-            type: 'city',
-            city: city,
-            specialization: specialization
-        });
+        searchSingleCity(city, specialization);
     });
 }
 
@@ -627,11 +623,7 @@ function setupTierWiseTab() {
         }
         
         // Perform search
-        searchDoctors({
-            type: 'tier',
-            tier: tier,
-            specialization: specialization
-        });
+        searchByTier(tier, specialization);
     });
 }
 
@@ -729,20 +721,24 @@ const API = {
             
             const result = JSON.parse(rawResult);
             
-            // Transform the API response to our expected format
-            return {
-                success: result.success !== false,
-                data: {
-                    doctors: result.data || [],
-                    count: result.data ? result.data.length : 0,
-                    cities_searched: result.metadata?.query?.city || 
-                                  (result.metadata?.query?.cities ? result.metadata.query.cities.length : 0) ||
-                                  (result.metadata?.query?.tier ? `Tier ${result.metadata.query.tier}` : 'All'),
-                    duration_seconds: result.metadata?.search_duration || 0,
-                    specialization: params.specialization
-                },
-                message: result.error
-            };
+            // Log full response structure for debugging
+            console.log('Response structure:', result);
+            
+            // Handle response format consistently
+            if (result.success) {
+                // All FastAPI endpoints should return data in result.data
+                return {
+                    success: true,
+                    data: result.data || [],
+                    metadata: result.metadata || {}
+                };
+            } else {
+                return {
+                    success: false,
+                    data: [],
+                    message: result.error || 'Unknown error'
+                };
+            }
         } catch (error) {
             console.error('API Error:', error);
             console.error('Error stack:', error.stack);
@@ -751,147 +747,247 @@ const API = {
     }
 };
 
-// Replace the mock search function with real implementation
-function searchDoctors(searchParams) {
-    console.log('Searching for doctors with params:', searchParams);
-    
-    // Clear previous results
-    clearSearchResults();
-    
-    // Show loading spinner and start progress simulation
-    showLoading();
-    simulateSearchProgress();
-    
-    // Perform API call
-    API.searchDoctors(searchParams)
-        .then(response => {
-            // Complete progress and hide loading spinner
-            completeSearchProgress();
-            
-            // Add slight delay to show the 100% completion
-            setTimeout(() => {
-                hideLoading();
-            
-            if (response.success) {
-                displaySearchResults(response.data, searchParams);
-            } else {
-                // Show error message
-                    showNotification('Error searching for doctors: ' + (response.message || 'Unknown error'), 'error');
-            }
-            }, 500);
-        })
-        .catch(error => {
-            // Stop progress simulation and hide loading if error occurs
-            completeSearchProgress();
-            hideLoading();
-            
-            console.error('Error searching for doctors:', error);
-            showNotification('Error searching for doctors: ' + error.message, 'error');
-        });
+// Single city search function
+async function searchSingleCity(city, specialization) {
+    try {
+        // Show loading indicators
+        document.getElementById('loading-indicator').style.display = 'flex';
+        
+        const searchParams = {
+            type: 'city',
+            city: city,
+            specialization: specialization
+        };
+        
+        // Call the API
+        const response = await API.searchDoctors(searchParams);
+        
+        // Handle the response
+        handleSearchResponse(response, 'city', searchParams);
+        
+    } catch (error) {
+        console.error('Error in searchSingleCity:', error);
+        showAlert('error', 'Failed to search. Please try again.');
+        document.getElementById('loading-indicator').style.display = 'none';
+    }
+}
+
+// Tier-wise search function
+async function searchByTier(tier, specialization) {
+    try {
+        // Show loading indicators
+        document.getElementById('loading-indicator').style.display = 'flex';
+        document.querySelector('.results-progress').style.display = 'flex';
+        
+        const searchParams = {
+            type: 'tier',
+            tier: tier,
+            specialization: specialization
+        };
+        
+        // Call the API
+        const response = await API.searchDoctors(searchParams);
+        
+        // Handle the response
+        handleSearchResponse(response, 'tier', searchParams);
+        
+    } catch (error) {
+        console.error('Error in searchByTier:', error);
+        showAlert('error', 'Failed to search. Please try again.');
+        document.getElementById('loading-indicator').style.display = 'none';
+        document.querySelector('.results-progress').style.display = 'none';
+    }
+}
+
+// Custom cities search function
+async function searchCustomCities(cities, specialization) {
+    try {
+        // Show loading indicators
+        document.getElementById('loading-indicator').style.display = 'flex';
+        document.querySelector('.results-progress').style.display = 'flex';
+        
+        const searchParams = {
+            type: 'custom',
+            cities: cities,
+            specialization: specialization
+        };
+        
+        // Call the API
+        const response = await API.searchDoctors(searchParams);
+        
+        // Handle the response
+        handleSearchResponse(response, 'custom', searchParams);
+        
+    } catch (error) {
+        console.error('Error in searchCustomCities:', error);
+        showAlert('error', 'Failed to search. Please try again.');
+        document.getElementById('loading-indicator').style.display = 'none';
+        document.querySelector('.results-progress').style.display = 'none';
+    }
+}
+
+// Countrywide search function
+async function searchCountrywide(specialization) {
+    try {
+        // Show loading indicators
+        document.getElementById('loading-indicator').style.display = 'flex';
+        document.querySelector('.results-progress').style.display = 'flex';
+        
+        const searchParams = {
+            type: 'countrywide',
+            specialization: specialization
+        };
+        
+        // Call the API
+        const response = await API.searchDoctors(searchParams);
+        
+        // Handle the response
+        handleSearchResponse(response, 'countrywide', searchParams);
+        
+    } catch (error) {
+        console.error('Error in searchCountrywide:', error);
+        showAlert('error', 'Failed to search. Please try again.');
+        document.getElementById('loading-indicator').style.display = 'none';
+        document.querySelector('.results-progress').style.display = 'none';
+    }
 }
 
 // Populate doctor table with data
 function populateDoctorTable(tableId, doctors) {
-    console.log(`Populating table ${tableId} with ${doctors.length} doctors`);
-    const tbody = document.getElementById(tableId).querySelector('tbody');
+    const table = document.getElementById(tableId);
+    if (!table) {
+        console.error(`Table with id ${tableId} not found`);
+        return;
+    }
     
-    // Clear existing rows
+    const tbody = table.querySelector('tbody');
+    if (!tbody) {
+        console.error(`Table body not found in table ${tableId}`);
+        return;
+    }
+    
+    // Clear existing content
     tbody.innerHTML = '';
     
-    doctors.forEach((doctor, index) => {
-        // Create row with fade-in animation
+    if (!doctors || doctors.length === 0) {
+        const noResultsRow = document.createElement('tr');
+        noResultsRow.innerHTML = `
+            <td colspan="6" class="no-results">
+                <div class="cell-content">No doctors found matching your criteria.</div>
+            </td>
+        `;
+        tbody.appendChild(noResultsRow);
+        return;
+    }
+    
+    // Add each doctor to the table
+    doctors.forEach(doctor => {
         const row = document.createElement('tr');
-        row.style.animationDelay = `${index * 30}ms`;
-        row.classList.add('fade-in');
-        
-        // Create doctor name cell
-        const nameCell = document.createElement('td');
-        nameCell.className = 'doctor-name';
-        nameCell.innerHTML = `<div class="cell-content" title="${doctor.name}">${doctor.name}</div>`;
-        row.appendChild(nameCell);
-        
-        // Create rating cell
-        const ratingCell = document.createElement('td');
-        ratingCell.className = 'doctor-rating';
-        ratingCell.innerHTML = `<div class="cell-content">${getRatingStars(doctor.rating)}</div>`;
-        ratingCell.setAttribute('data-rating', doctor.rating || 0);
-        row.appendChild(ratingCell);
-        
-        // Create reviews cell
-        const reviewsCell = document.createElement('td');
-        reviewsCell.className = 'doctor-reviews';
-        reviewsCell.innerHTML = `<div class="cell-content">${formatNumber(doctor.reviews || 0)}</div>`;
-        reviewsCell.setAttribute('data-reviews', doctor.reviews || 0);
-        row.appendChild(reviewsCell);
-        
-        // Create locations cell with truncation
-        const locationsCell = document.createElement('td');
-        locationsCell.className = 'doctor-locations';
-        locationsCell.innerHTML = formatLocations(doctor.locations || []);
-        row.appendChild(locationsCell);
-        
-        // Create city cell
-        const cityCell = document.createElement('td');
-        cityCell.className = 'doctor-city';
-        cityCell.innerHTML = `<div class="cell-content" title="${doctor.city}">${doctor.city || 'N/A'}</div>`;
-        row.appendChild(cityCell);
-        
-        // Create sources cell
-        const sourcesCell = document.createElement('td');
-        sourcesCell.className = 'doctor-sources';
-        sourcesCell.innerHTML = formatSources(doctor.contributing_sources || []);
-        row.appendChild(sourcesCell);
-        
-        // Add the row to the table
+        row.innerHTML = `
+            <td class="doctor-name">
+                <div class="cell-content">${escapeHtml(doctor.name)}</div>
+            </td>
+            <td class="doctor-rating">
+                <div class="cell-content">${getRatingStars(doctor.rating)}</div>
+            </td>
+            <td class="doctor-reviews">
+                <div class="cell-content">${formatNumber(doctor.reviews)}</div>
+            </td>
+            <td class="doctor-locations">
+                <div class="cell-content">${formatLocations(doctor.locations)}</div>
+            </td>
+            <td class="doctor-city">
+                <div class="cell-content">${escapeHtml(doctor.city)}</div>
+            </td>
+            <td class="doctor-sources">
+                <div class="cell-content">${formatSources(doctor.contributing_sources)}</div>
+            </td>
+        `;
         tbody.appendChild(row);
     });
     
-    // Add no results message if needed
-    if (doctors.length === 0) {
-        const noResultsRow = document.createElement('tr');
-        const noResultsCell = document.createElement('td');
-        noResultsCell.colSpan = 6;
-        noResultsCell.textContent = 'No doctors found matching your criteria.';
-        noResultsCell.className = 'no-results';
-        noResultsRow.appendChild(noResultsCell);
-        tbody.appendChild(noResultsRow);
-    }
-    
-    console.log(`Populated ${doctors.length} rows in table ${tableId}`);
+    // Add fade-in animation to rows
+    const rows = tbody.querySelectorAll('tr');
+    rows.forEach((row, index) => {
+        row.style.animation = `fadeInRows 0.3s ease forwards ${index * 0.05}s`;
+    });
 }
 
-// Format locations to display nicely in a cell with dropdown for multiple locations
+function getRatingStars(rating) {
+    if (!rating || rating === 0) {
+        return '<span class="no-rating">No rating</span>';
+    }
+    
+    // Ensure rating is a number and between 0 and 5
+    const numericRating = parseFloat(rating);
+    if (isNaN(numericRating)) {
+        return '<span class="no-rating">Invalid rating</span>';
+    }
+    
+    const normalizedRating = Math.min(Math.max(numericRating, 0), 5);
+    const fullStars = Math.floor(normalizedRating);
+    const hasHalfStar = normalizedRating % 1 >= 0.5;
+    const emptyStars = 5 - fullStars - (hasHalfStar ? 1 : 0);
+    
+    let starsHtml = '<div class="stars-container">';
+    
+    // Add full stars
+    for (let i = 0; i < fullStars; i++) {
+        starsHtml += '<i class="fas fa-star star-filled"></i>';
+    }
+    
+    // Add half star if needed
+    if (hasHalfStar) {
+        starsHtml += '<i class="fas fa-star-half-alt star-half"></i>';
+    }
+    
+    // Add empty stars
+    for (let i = 0; i < emptyStars; i++) {
+        starsHtml += '<i class="far fa-star star-empty"></i>';
+    }
+    
+    // Add numeric rating
+    starsHtml += `<span class="numeric-rating">${normalizedRating.toFixed(1)}</span>`;
+    starsHtml += '</div>';
+    
+    return starsHtml;
+}
+
 function formatLocations(locations) {
-    if (!locations || locations.length === 0) {
-        return '<span class="location-unknown">No location data available</span>';
+    if (!locations || !Array.isArray(locations) || locations.length === 0) {
+        return '<span class="no-rating">No locations available</span>';
     }
     
-    // Format the primary location with title for tooltip
     const primaryLocation = locations[0];
-    let html = `<div class="primary-location" title="${primaryLocation}">
-                  <i class="material-icons">place</i> ${primaryLocation}
-                </div>`;
+    let html = `
+        <div class="location-container">
+            <div class="primary-location">
+                <i class="material-icons">place</i>
+                ${escapeHtml(primaryLocation)}
+            </div>
+    `;
     
-    // If there are additional locations, add a dropdown
     if (locations.length > 1) {
-        const remainingLocations = locations.slice(1);
-        const locationCount = remainingLocations.length;
-        
-        html += `<div class="location-dropdown">
-                  <span class="location-count" onclick="toggleLocationDropdown(this)">
-                    <i class="material-icons">add_circle</i> ${locationCount} more
-                  </span>
-                  <div class="location-dropdown-content">
-                    <div class="dropdown-header">All Locations (${locations.length})</div>`;
-        
-        // Add all locations to the dropdown with numbering
-        locations.forEach((location, index) => {
-            html += `<div class="location-item" title="${location}"><i class="material-icons">place</i> ${location}</div>`;
-        });
-        
-        html += `</div></div>`;
+        const additionalLocations = locations.slice(1);
+        html += `
+            <div class="location-dropdown">
+                <div class="location-count" onclick="toggleLocationDropdown(this)">
+                    <i class="material-icons">add_circle_outline</i>
+                    ${additionalLocations.length} more
+                </div>
+                <div class="location-dropdown-content">
+                    ${additionalLocations.map(loc => `
+                        <div class="location-item">
+                            <i class="material-icons">place</i>
+                            ${escapeHtml(loc)}
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
     }
     
+    html += '</div>';
     return html;
 }
 
@@ -952,46 +1048,6 @@ function formatSources(sources) {
     return sourceTags;
 }
 
-// Improved rating stars display with clearer indicators
-function getRatingStars(rating) {
-    // Return "Not Rated" for falsy values (0, null, undefined)
-    if (!rating) return '<span class="no-rating">Not Rated</span>';
-    
-    // Convert rating to number and validate
-    rating = parseFloat(rating);
-    if (isNaN(rating)) return '<span class="no-rating">Invalid Rating</span>';
-    
-    // Clamp rating between 0 and 5
-    rating = Math.max(0, Math.min(5, rating));
-    
-    const fullStars = Math.floor(rating);
-    const hasHalfStar = rating % 1 >= 0.3; // Lower threshold to show half stars
-    let starsHTML = '<div class="stars-container">';
-    
-    // Add full stars
-    for (let i = 0; i < fullStars; i++) {
-        starsHTML += '<i class="material-icons star-filled">star</i>';
-    }
-    
-    // Add half star if needed
-    if (hasHalfStar) {
-        starsHTML += '<i class="material-icons star-half">star_half</i>';
-    }
-    
-    // Add empty stars to always show 5 stars total
-    const emptyStars = 5 - fullStars - (hasHalfStar ? 1 : 0);
-    for (let i = 0; i < emptyStars; i++) {
-        starsHTML += '<i class="material-icons star-empty">star_border</i>';
-    }
-    
-    starsHTML += '</div>';
-    
-    // Add numeric rating with improved styling
-    starsHTML += `<span class="numeric-rating">${rating.toFixed(1)}</span>`;
-    
-    return starsHTML;
-}
-
 // Add a verification function to ensure tables are correctly populated
 function verifyTablesPopulated() {
     console.log('Verifying table is populated...');
@@ -1032,205 +1088,188 @@ function verifyTablesPopulated() {
 
 // Toggle location dropdown visibility
 function toggleLocationDropdown(element) {
-    // Find the dropdown content element more reliably
-    // First, find the parent location-dropdown container
+    // Stop event propagation to prevent immediate closing
+    event.stopPropagation();
+    
+    // Find the dropdown container and content
     const dropdownContainer = element.closest('.location-dropdown');
-    if (!dropdownContainer) {
-        console.error('Location dropdown container not found');
+    const dropdownContent = dropdownContainer.querySelector('.location-dropdown-content');
+    
+    if (!dropdownContainer || !dropdownContent) {
+        console.error('Dropdown elements not found');
         return;
     }
     
-    // Then find the dropdown content within this container
-    const dropdown = dropdownContainer.querySelector('.location-dropdown-content');
-    if (!dropdown) {
-        console.error('Location dropdown content not found');
-        return;
-    }
-    
-    // Close any open dropdowns first
-    document.querySelectorAll('.location-dropdown-content.visible').forEach(openDropdown => {
-        if (openDropdown !== dropdown) {
-            openDropdown.classList.remove('visible');
+    // Close any other open dropdowns first
+    document.querySelectorAll('.location-dropdown-content.visible').forEach(dropdown => {
+        if (dropdown !== dropdownContent) {
+            dropdown.classList.remove('visible');
         }
     });
     
-    // Toggle this dropdown
-    dropdown.classList.toggle('visible');
+    // Toggle visibility
+    dropdownContent.classList.toggle('visible');
     
-    // Position the dropdown correctly
-    const rect = element.getBoundingClientRect();
-    const tableRect = document.querySelector('.doctors-table').getBoundingClientRect();
+    // Position the dropdown
+    const rect = dropdownContainer.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const spaceRight = window.innerWidth - rect.left;
     
-    // Handle positioning so it doesn't go off screen
-    if (rect.left + dropdown.offsetWidth > window.innerWidth) {
-        dropdown.style.left = 'auto';
-        dropdown.style.right = '0';
+    // Reset any previous positioning
+    dropdownContent.style.removeProperty('bottom');
+    dropdownContent.style.removeProperty('top');
+    dropdownContent.style.removeProperty('right');
+    dropdownContent.style.removeProperty('left');
+    
+    // Position vertically
+    if (spaceBelow < 250 && rect.top > spaceBelow) {
+        // Position above if there's more space
+        dropdownContent.style.bottom = '100%';
+        dropdownContent.style.marginBottom = '4px';
+        dropdownContent.style.marginTop = '0';
     } else {
-        dropdown.style.left = '0';
-        dropdown.style.right = 'auto';
+        // Position below
+        dropdownContent.style.top = '100%';
+        dropdownContent.style.marginTop = '4px';
+        dropdownContent.style.marginBottom = '0';
     }
     
-    // Close when clicking outside
+    // Position horizontally
+    if (spaceRight < 200) {
+        // Align right edge with container if near right edge
+        dropdownContent.style.right = '0';
+    } else {
+        // Align left edge with container (default)
+        dropdownContent.style.left = '0';
+    }
+    
+    // Add click outside listener to close dropdown
     function closeDropdown(e) {
-        // Only close if clicking outside the dropdown and the toggle element
-        if (!dropdown.contains(e.target) && !element.contains(e.target)) {
-            dropdown.classList.remove('visible');
+        if (!dropdownContainer.contains(e.target)) {
+            dropdownContent.classList.remove('visible');
             document.removeEventListener('click', closeDropdown);
         }
     }
     
-    // Add event listener to detect clicks outside
-    // Use setTimeout to avoid the current click event from immediately closing the dropdown
+    // Remove any existing click listeners before adding a new one
+    document.removeEventListener('click', closeDropdown);
+    // Add the click listener with a small delay to avoid immediate trigger
     setTimeout(() => {
         document.addEventListener('click', closeDropdown);
     }, 0);
 }
 
-// Enhanced display search results function with better table interactions
-function displaySearchResults(data, searchParams) {
-    console.log('Displaying search results:', data);
-    console.log('Doctor count from API:', data.count);
-    console.log('Doctors array length:', data.doctors ? data.doctors.length : 0);
+// Display the search results in the UI
+function displaySearchResults(data, searchType, searchParams) {
+    // Hide all loaders
+    document.getElementById('loading-indicator').style.display = 'none';
+    document.querySelector('.results-progress').style.display = 'none';
     
-    // Validate doctors data
-    if (!data.doctors || !Array.isArray(data.doctors)) {
-        console.error('Invalid doctors data - expected array but got:', typeof data.doctors);
-        showMessage('Error: Invalid data received from server', 'error');
-        return;
-    }
+    // Clear any existing alerts
+    clearAlert();
     
-    if (data.doctors.length === 0) {
-        console.warn('Doctors array is empty even though count is:', data.count);
-    } else {
-        console.log('First doctor sample:', data.doctors[0]);
-    }
-    
-    // Get the results section
+    // Get the results container
     const resultsSection = document.getElementById('results-section');
-    if (!resultsSection) {
-        console.error('Results section not found in the DOM!');
+    
+    // Log what we received
+    console.log(`Displaying results for ${searchType} search:`, data);
+    console.log('Search params:', searchParams);
+    
+    // Handle empty results
+    if (!data || !data.length) {
+        console.log('No results found');
+        showEmptyResultsMessage(searchType, searchParams);
         return;
     }
     
-    // Make sure results section is visible and not hidden
-    resultsSection.classList.remove('hidden');
+    // Show the results section
     resultsSection.style.display = 'block';
-    console.log('Results section display:', resultsSection.style.display);
-    console.log('Results section classes:', resultsSection.className);
     
-    // Set correct title based on search type
-    const resultsTitle = document.getElementById('results-title');
-    if (resultsTitle) {
-        if (searchParams.type === 'city') {
-            resultsTitle.textContent = `Top ${data.specialization} in ${searchParams.city}`;
-        } else if (searchParams.type === 'tier') {
-            resultsTitle.textContent = `Top ${data.specialization} in Tier ${searchParams.tier.slice(-1)} Cities`;
-        } else if (searchParams.type === 'custom') {
-            resultsTitle.textContent = `Top ${data.specialization} in Selected Cities`;
-        } else if (searchParams.type === 'countrywide') {
-            resultsTitle.textContent = `Top ${data.specialization} Across India`;
-        }
-    } else {
-        console.error('Results title element not found!');
+    // Update UI based on search type
+    updateSearchSummary(searchType, searchParams, data.length);
+    
+    // Sort data by rating by default
+    const sortedData = sortDoctorData(data, 'rating', 'desc');
+    
+    // Populate doctors table
+    populateDoctorsTable(sortedData);
+    
+    // Add sorting event listeners
+    setupTableSorting();
+    
+    // Scroll to results
+    resultsSection.scrollIntoView({ behavior: 'smooth' });
+}
+
+// Show a message when no results are found
+function showEmptyResultsMessage(searchType, params) {
+    console.log(`Showing empty results message for ${searchType} search`);
+    
+    // Get the results section and clear it
+    const resultsSection = document.getElementById('results-section');
+    resultsSection.style.display = 'block';
+    
+    // Clear existing content
+    const tableContainer = document.querySelector('.doctors-table-container');
+    if (tableContainer) {
+        tableContainer.innerHTML = '';
     }
     
-    // Update search metadata
-    const searchCountEl = document.getElementById('search-count');
-    const searchLocationEl = document.getElementById('search-location');
-    const searchSpecializationEl = document.getElementById('search-specialization');
-    const searchTimeEl = document.getElementById('search-time');
+    // Create message content based on search type
+    let message = 'No doctors found. ';
     
-    if (searchCountEl) searchCountEl.textContent = data.count;
-    if (searchLocationEl) searchLocationEl.textContent = typeof data.cities_searched === 'number' ? 
-        `${data.cities_searched} cities` : data.cities_searched;
-    if (searchSpecializationEl) searchSpecializationEl.textContent = data.specialization;
-    if (searchTimeEl) searchTimeEl.textContent = `${data.duration_seconds.toFixed(2)} seconds`;
-    
-    // Get the doctors table
-    const doctorsTable = document.getElementById('doctors-table');
-    if (!doctorsTable) {
-        console.error('Doctors table not found in the DOM!');
-        return;
+    if (searchType === 'city') {
+        message += `We couldn't find any ${params.specialization} doctors in ${params.city}.`;
+    } else if (searchType === 'tier') {
+        message += `We couldn't find any ${params.specialization} doctors in ${getTierName(params.tier)} cities.`;
+    } else if (searchType === 'custom') {
+        message += `We couldn't find any ${params.specialization} doctors in ${params.cities.join(', ')}.`;
+    } else if (searchType === 'countrywide') {
+        message += `We couldn't find any ${params.specialization} doctors in the database.`;
     }
     
-    // Clear existing table content
-    const tableBody = doctorsTable.querySelector('tbody');
-    if (tableBody) {
-        tableBody.innerHTML = '';
-        console.log('Cleared table body');
-    } else {
-        console.error('Doctors table body not found!');
-        return;
-    }
+    message += ' Please try a different search.';
     
-    // Sort doctors by rating and reviews (highest first)
-    const sortedDoctors = [...data.doctors].sort((a, b) => {
-        if (b.rating !== a.rating) {
-            return b.rating - a.rating;
-        }
-        return b.reviews - a.reviews;
-    });
+    // Create no-results element
+    const noResults = document.createElement('div');
+    noResults.className = 'no-results';
+    noResults.textContent = message;
     
-    console.log(`Total doctors after sorting: ${sortedDoctors.length}`);
-    
-    // Populate the table with all doctors
-    populateDoctorTable('doctors-table', sortedDoctors);
-    
-    // Show/hide no results message
-    const noResultsMsg = document.querySelector('#doctors-section .no-results-message');
-    if (noResultsMsg) {
-        console.log(`Setting no-results-message to ${sortedDoctors.length === 0 ? 'visible' : 'hidden'}`);
-        noResultsMsg.classList.toggle('hidden', sortedDoctors.length > 0);
-    } else {
-        console.error('No results message element not found!');
-    }
-    
-    // Add table interactions after a small delay to ensure table is populated
-    setTimeout(() => {
-        addTableInteractions();
-    }, 600);
-    
-    // Ensure the table has visible data
-    verifyTablesPopulated();
-    
-    // Fade in results with a slight delay
-    resultsSection.style.opacity = '0';
-    setTimeout(() => {
-        resultsSection.style.transition = 'opacity 0.5s ease';
-        resultsSection.style.opacity = '1';
-        console.log('Fading in results section, opacity:', resultsSection.style.opacity);
+    // Add it to the results section
+    const searchSummary = document.getElementById('search-summary');
+    if (searchSummary) {
+        // Update the search summary
+        searchSummary.style.display = 'block';
+        updateSearchSummary(searchType, params, 0);
         
-        // Scroll to results section after fade-in
-        setTimeout(() => {
-            resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }, 300);
-    }, 200);
-    
-    // Apply initial filtering and sorting
-    setTimeout(() => {
-        const sortBySelect = document.getElementById('sort-by');
-        if (sortBySelect) {
-            // Trigger change event to apply sorting
-            const event = new Event('change');
-            sortBySelect.dispatchEvent(event);
-        }
-    }, 500);
-    
-    // Hide the search container to give more focus to results
-    const searchContainer = document.querySelector('.search-container');
-    if (searchContainer) {
-        searchContainer.style.display = 'none';
-        console.log('Hiding search container, display:', searchContainer.style.display);
+        // Add the no results message after the summary
+        searchSummary.insertAdjacentElement('afterend', noResults);
     } else {
-        console.error('Search container not found!');
+        // Just add to results section if no summary
+        resultsSection.appendChild(noResults);
     }
     
-    // Show success message
-    if (data.count > 0) {
-        showMessage(`Found ${data.count} doctors matching your search criteria!`, 'success');
-    } else {
-        showMessage('No doctors found. Try a different specialization or location.', 'warning');
+    // Scroll to results section
+    resultsSection.scrollIntoView({ behavior: 'smooth' });
+}
+
+// Handle incoming API response for the search
+function handleSearchResponse(response, searchType, searchParams) {
+    console.log(`Handling ${searchType} search response:`, response);
+    
+    if (!response || !response.success) {
+        // Show error to user
+        showAlert('error', response && response.message ? response.message : 'Failed to get search results. Please try again.');
+        document.getElementById('loading-indicator').style.display = 'none';
+        document.querySelector('.results-progress').style.display = 'none';
+        return;
     }
+    
+    // Ensure we have a data array
+    const doctorsData = response.data || [];
+    
+    // Display the results
+    displaySearchResults(doctorsData, searchType, searchParams);
 }
 
 // Add event listeners for table interactions after rendering
@@ -1792,11 +1831,7 @@ function setupCountrywideTab() {
         }
         
         // Perform search
-        searchDoctors({
-            type: 'countrywide',
-            country: 'India',
-            specialization: specialization
-        });
+        searchCountrywide(specialization);
     });
 }
 
@@ -2137,4 +2172,447 @@ function exportToExcel(tableId, fileName) {
         hideLoading();
         showMessage('Error exporting to Excel: ' + error.message, 'error');
     }
+}
+
+// Set up the custom cities search form
+function setupCustomCitiesSearch() {
+    const customCitiesForm = document.getElementById('custom-cities-form');
+    if (!customCitiesForm) return;
+    
+    customCitiesForm.addEventListener('submit', function(event) {
+        event.preventDefault();
+        
+        // Get the specialization
+        const specialization = document.getElementById('custom-specialization').value;
+        if (!specialization) {
+            showAlert('error', 'Please select a specialization');
+            return;
+        }
+        
+        // Get the selected cities
+        const selectedCities = Array.from(document.querySelectorAll('#selected-cities .city-tag'))
+            .map(tag => tag.getAttribute('data-city'));
+        
+        if (selectedCities.length === 0) {
+            showAlert('error', 'Please select at least one city');
+            return;
+        }
+        
+        // Perform search
+        searchCustomCities(selectedCities, specialization);
+    });
+}
+
+// Update search summary with result information
+function updateSearchSummary(searchType, searchParams, resultCount) {
+    const searchSummary = document.getElementById('search-summary');
+    if (!searchSummary) return;
+    
+    searchSummary.style.display = 'block';
+    
+    // Set the count
+    const countElement = document.getElementById('result-count');
+    if (countElement) {
+        countElement.textContent = resultCount;
+    }
+    
+    // Set the title based on search type
+    const titleElement = document.getElementById('search-title');
+    if (titleElement) {
+        if (searchType === 'city') {
+            titleElement.textContent = `${searchParams.specialization} doctors in ${searchParams.city}`;
+        } else if (searchType === 'tier') {
+            titleElement.textContent = `${searchParams.specialization} doctors in ${getTierName(searchParams.tier)} cities`;
+        } else if (searchType === 'custom') {
+            titleElement.textContent = `${searchParams.specialization} doctors in selected cities`;
+        } else if (searchType === 'countrywide') {
+            titleElement.textContent = `${searchParams.specialization} doctors across India`;
+        }
+    }
+    
+    // Set the location info
+    const locationElement = document.getElementById('search-location');
+    if (locationElement) {
+        if (searchType === 'city') {
+            locationElement.textContent = searchParams.city;
+        } else if (searchType === 'tier') {
+            locationElement.textContent = getTierName(searchParams.tier);
+        } else if (searchType === 'custom') {
+            locationElement.textContent = searchParams.cities.join(', ');
+        } else if (searchType === 'countrywide') {
+            locationElement.textContent = 'India';
+        }
+    }
+}
+
+// Get readable tier name
+function getTierName(tier) {
+    if (tier === 'tier1') return 'Tier 1';
+    if (tier === 'tier2') return 'Tier 2';
+    if (tier === 'tier3') return 'Tier 3';
+    return tier;
+}
+
+// Sort doctor data by the specified field and direction
+function sortDoctorData(data, field, direction) {
+    if (!data || !Array.isArray(data)) return [];
+    
+    const sortedData = [...data];
+    
+    sortedData.sort((a, b) => {
+        let valueA = a[field] || 0;
+        let valueB = b[field] || 0;
+        
+        // Handle string values
+        if (field === 'name') {
+            valueA = String(valueA).toLowerCase();
+            valueB = String(valueB).toLowerCase();
+            return direction === 'asc' ? valueA.localeCompare(valueB) : valueB.localeCompare(valueA);
+        }
+        
+        // Handle numeric values
+        return direction === 'asc' ? valueA - valueB : valueB - valueA;
+    });
+    
+    return sortedData;
+}
+
+// Populate the doctors table with sorted data
+function populateDoctorsTable(doctorsData) {
+    console.log('Populating doctors table with', doctorsData.length, 'doctors');
+    
+    // Get the table container
+    const tableContainer = document.querySelector('.doctors-table-container');
+    if (!tableContainer) {
+        console.error('Table container not found!');
+        return;
+    }
+    
+    // Clear the table container
+    tableContainer.innerHTML = '';
+    
+    // Create the table
+    const table = document.createElement('table');
+    table.className = 'doctors-table';
+    
+    // Create the table header
+    const thead = document.createElement('thead');
+    const headerRow = document.createElement('tr');
+    
+    // Define the columns
+    const columns = [
+        { id: 'name', label: 'Name', sortable: true },
+        { id: 'rating', label: 'Rating', sortable: true },
+        { id: 'reviews', label: 'Reviews', sortable: true },
+        { id: 'locations', label: 'Locations', sortable: false },
+        { id: 'sources', label: 'Sources', sortable: false }
+    ];
+    
+    // Create the header cells
+    columns.forEach(column => {
+        const th = document.createElement('th');
+        th.setAttribute('data-column', column.id);
+        
+        const cellContent = document.createElement('div');
+        cellContent.className = 'cell-content';
+        
+        // Create sort button for sortable columns
+        if (column.sortable) {
+            const sortButton = document.createElement('button');
+            sortButton.className = 'sort-button';
+            sortButton.setAttribute('data-column', column.id);
+            sortButton.setAttribute('data-direction', 'desc'); // Default sort direction
+            
+            const sortLabel = document.createElement('span');
+            sortLabel.textContent = column.label;
+            
+            const sortIcon = document.createElement('span');
+            sortIcon.className = 'sort-icon';
+            sortIcon.innerHTML = '↓'; // Default to descending
+            
+            sortButton.appendChild(sortLabel);
+            sortButton.appendChild(sortIcon);
+            cellContent.appendChild(sortButton);
+        } else {
+            cellContent.textContent = column.label;
+        }
+        
+        th.appendChild(cellContent);
+        headerRow.appendChild(th);
+    });
+    
+    thead.appendChild(headerRow);
+    table.appendChild(thead);
+    
+    // Create the table body
+    const tbody = document.createElement('tbody');
+    
+    // Populate with doctor data
+    doctorsData.forEach(doctor => {
+        const row = document.createElement('tr');
+        
+        // Name cell
+        const nameCell = document.createElement('td');
+        nameCell.className = 'doctor-name-cell';
+        
+        const nameContent = document.createElement('div');
+        nameContent.className = 'cell-content';
+        
+        const doctorName = document.createElement('div');
+        doctorName.className = 'doctor-name';
+        doctorName.textContent = doctor.name || 'Unknown Doctor';
+        
+        nameContent.appendChild(doctorName);
+        nameCell.appendChild(nameContent);
+        row.appendChild(nameCell);
+        
+        // Rating cell
+        const ratingCell = document.createElement('td');
+        ratingCell.className = 'doctor-rating-cell';
+        
+        const ratingContent = document.createElement('div');
+        ratingContent.className = 'cell-content';
+        
+        const ratingStars = document.createElement('div');
+        ratingStars.className = 'doctor-rating';
+        ratingStars.innerHTML = getRatingStars(doctor.rating);
+        
+        ratingContent.appendChild(ratingStars);
+        ratingCell.appendChild(ratingContent);
+        row.appendChild(ratingCell);
+        
+        // Reviews cell
+        const reviewsCell = document.createElement('td');
+        reviewsCell.className = 'doctor-reviews-cell';
+        
+        const reviewsContent = document.createElement('div');
+        reviewsContent.className = 'cell-content';
+        
+        const reviewsCount = document.createElement('div');
+        reviewsCount.className = 'doctor-reviews';
+        reviewsCount.textContent = doctor.reviews ? doctor.reviews : 'No reviews';
+        
+        reviewsContent.appendChild(reviewsCount);
+        reviewsCell.appendChild(reviewsContent);
+        row.appendChild(reviewsCell);
+        
+        // Locations cell
+        const locationsCell = document.createElement('td');
+        locationsCell.className = 'doctor-locations-cell';
+        
+        const locationsContent = document.createElement('div');
+        locationsContent.className = 'cell-content';
+        
+        if (doctor.locations && doctor.locations.length > 0) {
+            const locationDropdown = document.createElement('div');
+            locationDropdown.className = 'location-dropdown';
+            
+            // Create the visible location count
+            const locationCount = document.createElement('div');
+            locationCount.className = 'location-count';
+            
+            // Show first location and count of others
+            const mainLocation = doctor.locations[0];
+            const otherCount = doctor.locations.length - 1;
+            
+            if (otherCount > 0) {
+                locationCount.innerHTML = `${mainLocation} <span class="more-count">+${otherCount} more</span>`;
+            } else {
+                locationCount.textContent = mainLocation;
+            }
+            
+            // Create the dropdown content
+            const dropdownContent = document.createElement('div');
+            dropdownContent.className = 'location-dropdown-content';
+            
+            // Add each location to the dropdown
+            doctor.locations.forEach(location => {
+                const locationItem = document.createElement('div');
+                locationItem.className = 'location-item';
+                locationItem.textContent = location;
+                dropdownContent.appendChild(locationItem);
+            });
+            
+            // Add click event to toggle dropdown
+            locationCount.addEventListener('click', function(event) {
+                event.stopPropagation();
+                toggleLocationDropdown(this);
+            });
+            
+            locationDropdown.appendChild(locationCount);
+            locationDropdown.appendChild(dropdownContent);
+            locationsContent.appendChild(locationDropdown);
+        } else {
+            const noLocation = document.createElement('div');
+            noLocation.className = 'no-location';
+            noLocation.textContent = 'No location data';
+            locationsContent.appendChild(noLocation);
+        }
+        
+        locationsCell.appendChild(locationsContent);
+        row.appendChild(locationsCell);
+        
+        // Sources cell
+        const sourcesCell = document.createElement('td');
+        sourcesCell.className = 'doctor-sources-cell';
+        
+        const sourcesContent = document.createElement('div');
+        sourcesContent.className = 'cell-content';
+        
+        if (doctor.sources && doctor.sources.length > 0) {
+            const sourceList = document.createElement('div');
+            sourceList.className = 'source-list';
+            
+            doctor.sources.forEach(source => {
+                const sourceItem = document.createElement('div');
+                sourceItem.className = 'source-item';
+                sourceItem.textContent = source;
+                sourceList.appendChild(sourceItem);
+            });
+            
+            sourcesContent.appendChild(sourceList);
+        } else {
+            const noSources = document.createElement('div');
+            noSources.className = 'no-sources';
+            noSources.textContent = 'No source data';
+            sourcesContent.appendChild(noSources);
+        }
+        
+        sourcesCell.appendChild(sourcesContent);
+        row.appendChild(sourcesCell);
+        
+        // Add the row to the table
+        tbody.appendChild(row);
+    });
+    
+    table.appendChild(tbody);
+    tableContainer.appendChild(table);
+}
+
+// Add sorting functionality to the table headers
+function setupTableSorting() {
+    const sortButtons = document.querySelectorAll('.sort-button');
+    
+    sortButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const column = this.getAttribute('data-column');
+            const currentDirection = this.getAttribute('data-direction');
+            const newDirection = currentDirection === 'asc' ? 'desc' : 'asc';
+            
+            // Update the button's direction attribute
+            this.setAttribute('data-direction', newDirection);
+            
+            // Update the sort icon
+            const sortIcon = this.querySelector('.sort-icon');
+            sortIcon.innerHTML = newDirection === 'asc' ? '↑' : '↓';
+            
+            // Get the current data
+            const doctorsTable = document.querySelector('.doctors-table');
+            if (!doctorsTable) return;
+            
+            // Get all rows and convert to array
+            const rows = Array.from(doctorsTable.querySelectorAll('tbody tr'));
+            if (rows.length === 0) return;
+            
+            // Extract data from the table
+            const data = rows.map(row => {
+                const cells = row.querySelectorAll('td');
+                return {
+                    name: cells[0].textContent.trim(),
+                    rating: parseFloat(cells[1].textContent) || 0,
+                    reviews: parseInt(cells[2].textContent) || 0,
+                    element: row // Keep a reference to the row element
+                };
+            });
+            
+            // Sort the data
+            data.sort((a, b) => {
+                let valueA = a[column];
+                let valueB = b[column];
+                
+                if (column === 'name') {
+                    return newDirection === 'asc' 
+                        ? valueA.localeCompare(valueB) 
+                        : valueB.localeCompare(valueA);
+                } else {
+                    return newDirection === 'asc' 
+                        ? valueA - valueB 
+                        : valueB - valueA;
+                }
+            });
+            
+            // Reorder the rows in the table
+            const tbody = doctorsTable.querySelector('tbody');
+            tbody.innerHTML = '';
+            
+            data.forEach(item => {
+                tbody.appendChild(item.element);
+            });
+        });
+    });
+}
+
+// Show an alert message to the user
+function showAlert(type, message) {
+    const alertContainer = document.getElementById('alert-container');
+    if (!alertContainer) {
+        console.error('Alert container not found!');
+        return;
+    }
+    
+    // Clear any existing alerts
+    clearAlert();
+    
+    // Create the alert element
+    const alert = document.createElement('div');
+    alert.className = `alert alert-${type}`;
+    alert.textContent = message;
+    
+    // Add close button
+    const closeButton = document.createElement('button');
+    closeButton.className = 'alert-close';
+    closeButton.innerHTML = '&times;';
+    closeButton.addEventListener('click', clearAlert);
+    
+    alert.appendChild(closeButton);
+    alertContainer.appendChild(alert);
+    
+    // Auto-hide after 5 seconds
+    setTimeout(clearAlert, 5000);
+}
+
+// Clear all alerts
+function clearAlert() {
+    const alertContainer = document.getElementById('alert-container');
+    if (alertContainer) {
+        alertContainer.innerHTML = '';
+    }
+}
+
+// Initialize the application
+function init() {
+    // Set up tab switching
+    setupTabs();
+    
+    // Set up search forms
+    setupSingleCitySearch();
+    setupTierCitySearch();
+    setupCustomCitiesSearch();
+    setupCountrywideSearch();
+    
+    // Add expandable sections
+    setupExpanders();
+    
+    // Set up export button
+    setupExportButton();
+    
+    console.log('Application initialized');
+}
+
+// Add window load event listener to initialize the application
+document.addEventListener('DOMContentLoaded', init);
+
+// Call init in case the DOM is already loaded
+if (document.readyState === 'complete' || document.readyState === 'interactive') {
+    init();
 }
