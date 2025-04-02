@@ -865,6 +865,7 @@ select#sort-by:focus {
 .doctor-rating .cell-content {
     display: flex;
     align-items: center;
+    justify-content: flex-start;
 }
 
 .doctor-reviews .cell-content {
@@ -973,7 +974,7 @@ select#sort-by:focus {
     overflow-x: auto;
     background-color: #fff;
     border-radius: 8px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
     margin-bottom: 2rem;
 }
 
@@ -985,7 +986,7 @@ select#sort-by:focus {
 
 .doctors-table th, 
 .doctors-table td {
-    padding: 12px 15px;
+    padding: 16px 15px;
     text-align: left;
     border-bottom: 1px solid #eaeaea;
     white-space: nowrap;
@@ -1002,7 +1003,7 @@ select#sort-by:focus {
     top: 0;
     z-index: 10;
     box-shadow: inset 0 -1px 0 #e0e6ed;
-    padding: 12px 15px;
+    padding: 14px 15px;
     text-transform: uppercase;
     font-size: 12px;
     letter-spacing: 0.5px;
@@ -1025,7 +1026,7 @@ select#sort-by:focus {
 
 .doctors-table th:nth-child(2),
 .doctors-table td:nth-child(2) {
-    width: 10%; /* Rating */
+    width: 12%; /* Rating - increased width */
 }
 
 .doctors-table th:nth-child(3),
@@ -1035,7 +1036,7 @@ select#sort-by:focus {
 
 .doctors-table th:nth-child(4),
 .doctors-table td:nth-child(4) {
-    width: 30%; /* Locations */
+    width: 25%; /* Locations - decreased width */
 }
 
 .doctors-table th:nth-child(5),
@@ -1045,7 +1046,7 @@ select#sort-by:focus {
 
 .doctors-table th:nth-child(6),
 .doctors-table td:nth-child(6) {
-    width: 20%; /* Sources */
+    width: 23%; /* Sources - increased width */
 }
 
 /* Cell content wrapper for truncation */
@@ -1066,11 +1067,14 @@ select#sort-by:focus {
 .doctor-rating .cell-content {
     display: flex;
     align-items: center;
+    justify-content: flex-start;
 }
 
 .doctor-rating i {
     color: #ffc107;
     margin-right: 2px;
+    font-size: 16px;
+    display: inline-block;
 }
 
 /* Reviews styling */
@@ -1103,6 +1107,7 @@ select#sort-by:focus {
     position: relative;
     display: inline-block;
     margin-left: 5px;
+    z-index: 20;
 }
 
 .location-count {
@@ -1154,18 +1159,26 @@ select#sort-by:focus {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    transition: background-color 0.2s;
+}
+
+.location-dropdown-content div:hover:not(.dropdown-header) {
+    background-color: #f5f8ff;
 }
 
 .location-dropdown-content div i {
-    margin-right: 5px;
-    color: #3f51b5;
+    margin-right: 8px;
+    color: #4CAF50;
+    font-size: 16px;
 }
 
 .location-dropdown-content .dropdown-header {
     font-weight: 600;
-    color: var(--color-navy);
+    color: #3f51b5;
     background-color: #f7f9fc;
     border-bottom: 1px solid #eaeaea;
+    font-size: 14px;
+    padding: 10px 15px;
 }
 
 .location-unknown {
@@ -1176,41 +1189,49 @@ select#sort-by:focus {
 /* Sources styling */
 .doctor-sources {
     display: flex;
-    flex-wrap: nowrap;
-    overflow: hidden;
-    gap: 5px;
+    flex-wrap: wrap;
+    gap: 4px;
+    max-width: 100%;
+    overflow: visible;
 }
 
 .source-tag {
     display: inline-flex;
     align-items: center;
-    padding: 3px 6px;
-    border-radius: 4px;
-    font-size: 12px;
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    margin: 1px;
+    transition: all 0.2s ease;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
     font-weight: 500;
-    color: white;
-    margin-right: 4px;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
     white-space: nowrap;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.12);
-    border: 1px solid rgba(255,255,255,0.2);
+}
+
+.source-tag .material-icons {
+    font-size: 14px;
+    margin-right: 4px;
 }
 
 .source-tag:hover {
     transform: translateY(-1px);
-    box-shadow: 0 2px 5px rgba(0,0,0,0.15);
-    transition: all 0.2s ease;
-}
-
-.source-unknown {
-    background-color: #e0e0e0;
-    color: #757575;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.15);
 }
 
 .source-more {
-    background-color: #e9ecef;
-    color: #495057;
-    font-size: 11px;
-    padding: 2px 5px;
+    background-color: #f1f3f5 !important;
+    color: #6c757d !important;
+    font-size: 0.75rem;
+    padding: 2px 8px;
+    border-radius: 12px;
+}
+
+.source-unknown {
+    background-color: #f5f5f5 !important;
+    color: #9e9e9e !important;
 }
 
 /* Doctor city styling */
@@ -1556,44 +1577,44 @@ datalist {
     transform: translateY(-2px);
 }
 
-/* Source tag enhancements */
-.doctor-sources {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
-    max-width: 100%;
-}
-
+/* Source tag styling */
 .source-tag {
     display: inline-flex;
     align-items: center;
     padding: 3px 8px;
     border-radius: 12px;
     font-size: 0.75rem;
-    margin: 2px;
+    margin: 1px;
     transition: all 0.2s ease;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
     font-weight: 500;
-    max-width: calc(100% - 4px);
+    max-width: 100%;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-.source-tag i {
+.source-tag .material-icons {
+    font-size: 14px;
     margin-right: 4px;
-    font-size: 0.7rem;
-    flex-shrink: 0;
 }
 
 .source-tag:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 3px 5px rgba(0,0,0,0.1);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+}
+
+.source-more {
+    background-color: #f1f3f5 !important;
+    color: #6c757d !important;
+    font-size: 0.75rem;
+    padding: 2px 8px;
+    border-radius: 12px;
 }
 
 .source-unknown {
-    background-color: #f5f5f5;
-    color: #9e9e9e;
+    background-color: #f5f5f5 !important;
+    color: #9e9e9e !important;
 }
 
 /* Enhanced Location Display */
@@ -1695,7 +1716,6 @@ datalist {
 .location-unknown {
     color: #9e9e9e;
     font-style: italic;
-    font-size: 0.85rem;
 }
 
 /* Doctor Reviews */
@@ -2194,12 +2214,13 @@ input[type="range"]::-moz-range-thumb:hover {
     background-color: #f1f3f5 !important;
     color: #6c757d !important;
     font-size: 0.75rem;
-    padding: 2px 6px;
+    padding: 2px 8px;
+    border-radius: 12px;
 }
 
 .source-unknown {
-    background-color: #f1f3f5 !important;
-    color: #6c757d !important;
+    background-color: #f5f5f5 !important;
+    color: #9e9e9e !important;
 }
 
 /* ===== Table Row Animations ===== */
@@ -2237,8 +2258,11 @@ input[type="range"]::-moz-range-thumb:hover {
     margin-left: 5px;
     font-weight: 600;
     font-size: 13px;
-    color: #555;
-    vertical-align: middle;
+    color: #333;
+    display: inline-block;
+    background: rgba(255, 215, 0, 0.15);
+    padding: 2px 6px;
+    border-radius: 4px;
 }
 
 /* Fade-in animation for table rows */

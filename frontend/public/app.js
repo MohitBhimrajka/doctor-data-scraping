@@ -880,10 +880,10 @@ function formatLocations(locations) {
                     <i class="material-icons">add_circle</i> ${remainingLocations.length} more
                   </span>
                   <div class="location-dropdown-content">
-                    <div class="dropdown-header">All Locations</div>`;
+                    <div class="dropdown-header">All Locations (${locations.length})</div>`;
         
-        // Add all locations to the dropdown
-        locations.forEach(location => {
+        // Add all locations to the dropdown with numbering
+        locations.forEach((location, index) => {
             html += `<div title="${location}"><i class="material-icons">place</i> ${location}</div>`;
         });
         
@@ -897,21 +897,21 @@ function formatLocations(locations) {
 function formatSources(sources) {
     // If sources not provided or empty, return unknown tag
     if (!sources || sources.length === 0) {
-        return '<span class="source-tag source-unknown" title="No known source">Unknown</span>';
+        return '<span class="source-tag source-unknown" title="No known source"><i class="material-icons">help_outline</i> Unknown</span>';
     }
     
     // Define color mapping for different sources with improved styling
     const sourceMapping = {
-        'practo': { color: '#13b2b8', icon: '🏥', name: 'Practo' },
-        'justdial': { color: '#f95a2b', icon: '📞', name: 'JustDial' },
-        'general': { color: '#4285F4', icon: '🔍', name: 'General' },
-        'hospital': { color: '#34a853', icon: '🏥', name: 'Hospital' },
-        'social': { color: '#fbbc05', icon: '👥', name: 'Social' },
-        'unknown': { color: '#f1f3f5', icon: '❓', name: 'Unknown' }
+        'practo': { color: '#13b2b8', icon: 'local_hospital', name: 'Practo' },
+        'justdial': { color: '#f95a2b', icon: 'call', name: 'JustDial' },
+        'general': { color: '#4285F4', icon: 'search', name: 'General' },
+        'hospital': { color: '#34a853', icon: 'local_hospital', name: 'Hospital' },
+        'social': { color: '#fbbc05', icon: 'people', name: 'Social' },
+        'unknown': { color: '#f1f3f5', icon: 'help_outline', name: 'Unknown' }
     };
     
-    // Limit to max 3 sources to prevent overflow
-    const maxSourcesToShow = 3;
+    // Limit to max 2 sources to prevent overflow
+    const maxSourcesToShow = 2;
     const visibleSources = sources.slice(0, maxSourcesToShow);
     const hiddenCount = Math.max(0, sources.length - maxSourcesToShow);
     
@@ -925,17 +925,17 @@ function formatSources(sources) {
         const sourceInfo = sourceMapping[mapping];
         
         return `<span class="source-tag" 
-                     style="background-color: ${sourceInfo.color};" 
+                     style="background-color: ${sourceInfo.color}; color: white;" 
                      title="${source}">
-                   ${sourceInfo.icon} ${sourceInfo.name}
+                   <i class="material-icons">${sourceInfo.icon}</i> ${sourceInfo.name}
                </span>`;
     }).join('');
     
     // Add "more" tag if there are additional sources
     if (hiddenCount > 0) {
         sourceTags += `<span class="source-tag source-more" 
-                             title="${hiddenCount} more sources">
-                         +${hiddenCount}
+                             title="${sources.slice(maxSourcesToShow).join(', ')}">
+                         <i class="material-icons">add</i> ${hiddenCount}
                      </span>`;
     }
     
@@ -1012,16 +1012,41 @@ function verifyTablesPopulated() {
 // Toggle location dropdown visibility
 function toggleLocationDropdown(element) {
     const dropdown = element.nextElementSibling;
+    
+    // Close any open dropdowns first
+    document.querySelectorAll('.location-dropdown-content.visible').forEach(openDropdown => {
+        if (openDropdown !== dropdown) {
+            openDropdown.classList.remove('visible');
+        }
+    });
+    
+    // Toggle this dropdown
     if (dropdown) {
         dropdown.classList.toggle('visible');
         
+        // Position the dropdown correctly
+        const rect = element.getBoundingClientRect();
+        const tableRect = document.querySelector('.doctors-table').getBoundingClientRect();
+        
+        // Handle positioning so it doesn't go off screen
+        if (rect.left + dropdown.offsetWidth > window.innerWidth) {
+            dropdown.style.left = 'auto';
+            dropdown.style.right = '0';
+        } else {
+            dropdown.style.left = '0';
+            dropdown.style.right = 'auto';
+        }
+        
         // Close when clicking outside
-        document.addEventListener('click', function closeDropdown(e) {
+        function closeDropdown(e) {
             if (!dropdown.contains(e.target) && e.target !== element) {
                 dropdown.classList.remove('visible');
                 document.removeEventListener('click', closeDropdown);
             }
-        });
+        }
+        
+        // Add event listener to detect clicks outside
+        document.addEventListener('click', closeDropdown);
     }
 }
 
