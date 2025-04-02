@@ -12,11 +12,16 @@ services:
       - key: BACKEND_API_URL
         value: http://localhost:8000
       - key: FRONTEND_URL
-        value: http://localhost:3000
+        fromService:
+          name: doctor-search-app
+          type: web
+          property: url
       - key: PORT
-        value: 3000
+        value: 8000
       - key: NODE_VERSION
         value: 18
-    healthCheckPath: /health
+      - key: PYTHON_VERSION
+        value: 3.11
+    healthCheckPath: /
     autoDeploy: true
     plan: starter 
